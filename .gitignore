@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+env/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+dist/
+build/
+
+# ML / data (keep big files out if needed)
+# *.csv
+# *.wav
+
+# Jupyter
+.ipynb_checkpoints/
