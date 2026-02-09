@@ -213,7 +213,7 @@ SAMPLES_DIR = "app/static/samples"
 FS = 16000
 
 
-def build_room(L, W, H, wall_a, floor_a, ceil_a, max_order=20):
+def build_room(L, W, H, wall_a, floor_a, ceil_a, max_order=30):
     """
     Uses pra.make_materials (like your notebook style), with air_absorption enabled.
     """
@@ -266,11 +266,41 @@ def compute_rir(room):
     return rir
 
 
-def estimate_rt60_schroeder(rir):
-    try:
-        return float(pra.experimental.measure_rt60(rir, fs=FS))
-    except Exception:
-        return float("nan")
+# def estimate_rt60_schroeder(rir):
+#     try:
+#         return float(pra.experimental.measure_rt60(rir, fs=FS))
+#     except Exception:
+#         return float("nan")
+
+def estimate_rt60_t30(rir):
+    """
+    Robust RT60 estimate using Schroeder EDC + linear fit (T30 style).
+    Fits between -5 dB and -35 dB when possible, else falls back to -5..-25 (T20).
+    """
+    rir = np.asarray(rir, dtype=np.float64)
+
+    # Energy decay curve (Schroeder integration)
+    edc = np.cumsum(rir[::-1] ** 2)[::-1]
+    edc = edc / (edc[0] + 1e-12)
+    edc_db = 10.0 * np.log10(edc + 1e-12)
+
+    def fit_rt60(db_start, db_end):
+        idx = np.where((edc_db <= db_start) & (edc_db >= db_end))[0]
+        if len(idx) < 20:
+            return None
+        t = idx / FS
+        y = edc_db[idx]
+        # Linear regression y = a*t + b
+        a, b = np.polyfit(t, y, 1)
+        if a >= 0:
+            return None
+        # RT60 is time to decay 60 dB
+        return float(-60.0 / a)
+
+    rt = fit_rt60(-5.0, -35.0)  # T30 range
+    if rt is None:
+        rt = fit_rt60(-5.0, -25.0)  # T20 fallback
+    return rt if rt is not None else float("nan")
 
 
 def save_wav(path, audio):
@@ -376,15 +406,24 @@ def generate_audio(L, W, H, wall_a, floor_a, ceil_a, panels):
     dry = load_and_resample_dry_wav()
 
     # BEFORE room
-    room_before = build_room(L, W, H, wall_a, floor_a, ceil_a, max_order=20)
+    room_before = build_room(L, W, H, wall_a, floor_a, ceil_a, max_order=35)
     rir_before = compute_rir(room_before)
-    rt60_before = estimate_rt60_schroeder(rir_before)
+    # rt60_before = estimate_rt60_schroeder(rir_before)
+    rt60_before = estimate_rt60_t30(rir_before)
 
     # AFTER room (boost wall absorption from panel layout)
     wall_a_after = boosted_wall_absorption(wall_a, panels, boost_strength=0.5)
-    room_after = build_room(L, W, H, wall_a_after, floor_a, ceil_a, max_order=20)
+    room_after = build_room(L, W, H, wall_a_after, floor_a, ceil_a, max_order=30)
     rir_after = compute_rir(room_after)
-    rt60_after = estimate_rt60_schroeder(rir_after)
+    # rt60_after = estimate_rt60_schroeder(rir_after)
+    rt60_after  = estimate_rt60_t30(rir_after)
+
+    if (rt60_before == rt60_before) and (rt60_after == rt60_after) and (rt60_after > rt60_before):
+    # Logically should not happen if absorption increased.
+    # Keep values but expose a flag so you can explain in demo/report.
+        rt60_flag = "rt60_after_gt_before_check_decay_fit"
+    else:
+        rt60_flag = "ok"
 
     # CLAP auralisation (clearer than raw RIR audio)
     clap = make_clap()
@@ -423,4 +462,5 @@ def generate_audio(L, W, H, wall_a, floor_a, ceil_a, panels):
         "effective_wall_a_before": float(wall_a),
         "effective_wall_a_after": float(wall_a_after),
         "panel_coverage": panel_coverage_from_rects(panels),
+        "rt60_check_flag": rt60_flag,
     }
