@@ -12,4 +12,5 @@ python-multipart
 pyroomacoustics
 soundfile
 scipy
+transformers
 

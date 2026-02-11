@@ -1,88 +1,799 @@
-import React, { useMemo, useRef, useState } from "react";
-import { api } from "./api";
-import PanelView from "./components/PanelView";
+// import React, { useMemo, useRef, useState } from "react";
+// import { api } from "./api";
+// import PanelView from "./components/PanelView";
 
+// const MATERIALS = {
+//   painted_plaster: { label: "Painted plaster", a: 0.07 },
+//   gypsum: { label: "Gypsum board", a: 0.10 },
+//   concrete: { label: "Concrete", a: 0.03 },
+//   wood: { label: "Wood", a: 0.20 },
+//   carpet: { label: "Carpet", a: 0.45 },
+// };
+
+// const BASE = "http://127.0.0.1:8000";
+
+// function clamp01(x) {
+//   return Math.max(0, Math.min(1, x));
+// }
+
+// function fmt(x, d = 3) {
+//   return typeof x === "number" && isFinite(x) ? x.toFixed(d) : "-";
+// }
+
+// export default function App() {
+//   // ---------- inputs ----------
+//   const [L, setL] = useState(5.2);
+//   const [W, setW] = useState(4.1);
+//   const [H, setH] = useState(2.8);
+
+//   // ---------- image upload ----------
+//   const [imageFile, setImageFile] = useState(null);
+//   const [imageURL, setImageURL] = useState("");
+//   const imgRef = useRef(null);
+//   const overlayRef = useRef(null);
+
+//   // ---------- rectangle selection mode ----------
+//   // mode: "wall" | "floor" | "ceiling" | "exclude" | null
+//   const [mode, setMode] = useState(null);
+//   const [drag, setDrag] = useState(null); // {x0,y0,x1,y1} in normalized coords
+
+//   // samples: {wall:{x1,y1,x2,y2}, floor:..., ceiling:...}
+//   const [samples, setSamples] = useState({
+//     wall: null,
+//     floor: null,
+//     ceiling: null,
+//   });
+
+//   const [exclusions, setExclusions] = useState([]); // array of rects
+
+//   // ---------- material suggestion + override ----------
+//   const [suggestions, setSuggestions] = useState({
+//     wall: null,
+//     floor: null,
+//     ceiling: null,
+//   });
+
+//   const [override, setOverride] = useState({
+//     wall: "painted_plaster",
+//     floor: "wood",
+//     ceiling: "painted_plaster",
+//   });
+
+//   const wall_a = useMemo(() => MATERIALS[override.wall].a, [override.wall]);
+//   const floor_a = useMemo(() => MATERIALS[override.floor].a, [override.floor]);
+//   const ceil_a = useMemo(() => MATERIALS[override.ceiling].a, [override.ceiling]);
+
+//   // ---------- outputs ----------
+//   const [recommendation, setRecommendation] = useState(null);
+//   const [audio, setAudio] = useState(null);
+
+//   // ---------- UI state ----------
+//   const [err, setErr] = useState("");
+//   const [busy, setBusy] = useState({ suggest: false, rec: false, audio: false });
+
+//   // ---------- handlers ----------
+//   const onPickImage = (file) => {
+//     setImageFile(file);
+//     const url = URL.createObjectURL(file);
+//     setImageURL(url);
+//     setSamples({ wall: null, floor: null, ceiling: null });
+//     setExclusions([]);
+//     setSuggestions({ wall: null, floor: null, ceiling: null });
+//     setRecommendation(null);
+//     setAudio(null);
+//   };
+
+//   const getNormPos = (evt) => {
+//     const box = overlayRef.current.getBoundingClientRect();
+//     const x = clamp01((evt.clientX - box.left) / box.width);
+//     const y = clamp01((evt.clientY - box.top) / box.height);
+//     return { x, y };
+//   };
+
+//   const onMouseDown = (evt) => {
+//     if (!mode) return;
+//     if (!imageURL) return;
+//     const { x, y } = getNormPos(evt);
+//     setDrag({ x0: x, y0: y, x1: x, y1: y });
+//   };
+
+//   const onMouseMove = (evt) => {
+//     if (!drag) return;
+//     const { x, y } = getNormPos(evt);
+//     setDrag((d) => ({ ...d, x1: x, y1: y }));
+//   };
+
+//   const finalizeRect = (r) => {
+//     const x1 = Math.min(r.x0, r.x1);
+//     const x2 = Math.max(r.x0, r.x1);
+//     const y1 = Math.min(r.y0, r.y1);
+//     const y2 = Math.max(r.y0, r.y1);
+
+//     // ignore tiny boxes
+//     if ((x2 - x1) < 0.03 || (y2 - y1) < 0.03) return null;
+
+//     return { x1, y1, x2, y2 };
+//   };
+
+//   const onMouseUp = () => {
+//     if (!drag) return;
+//     const rect = finalizeRect(drag);
+//     setDrag(null);
+//     if (!rect) return;
+
+//     if (mode === "exclude") {
+//       setExclusions((xs) => [...xs, rect]);
+//     } else {
+//       setSamples((s) => ({ ...s, [mode]: rect }));
+//     }
+//   };
+
+//   const clearAll = () => {
+//     setSamples({ wall: null, floor: null, ceiling: null });
+//     setExclusions([]);
+//     setSuggestions({ wall: null, floor: null, ceiling: null });
+//     setRecommendation(null);
+//     setAudio(null);
+//     setErr("");
+//   };
+
+//   const callSuggestOne = async (surface) => {
+//     if (!imageFile) throw new Error("Upload an image first.");
+//     const rect = samples[surface];
+//     if (!rect) throw new Error(`Draw a ${surface} sample rectangle first.`);
+
+//     // use center of rectangle as click x,y
+//     const cx = (rect.x1 + rect.x2) / 2;
+//     const cy = (rect.y1 + rect.y2) / 2;
+//     const boxSize = Math.round(Math.max((rect.x2 - rect.x1), (rect.y2 - rect.y1)) * 600);
+//     const box_size = Math.max(96, Math.min(512, boxSize));
+
+//     const fd = new FormData();
+//     fd.append("image", imageFile);
+//     fd.append("surface", surface);         // wall/floor/ceiling
+//     fd.append("x", String(cx));            // normalized 0..1
+//     fd.append("y", String(cy));            // normalized 0..1
+//     fd.append("box_size", String(box_size));
+
+//     const res = await api.suggestMaterial(fd);
+//     return res; // expected {surface, predicted_label, confidence?, absorption? ...}
+//   };
+
+//   const onSuggestMaterials = async () => {
+//     setErr("");
+//     setBusy((b) => ({ ...b, suggest: true }));
+//     try {
+//       const wallRes = await callSuggestOne("wall");
+//       const floorRes = await callSuggestOne("floor");
+//       const ceilRes = await callSuggestOne("ceiling");
+
+//       setSuggestions({
+//         wall: wallRes,
+//         floor: floorRes,
+//         ceiling: ceilRes,
+//       });
+
+//       // If backend returns a label that matches our keys, auto-select it:
+//       const tryMap = (res, fallback) => {
+//         const lbl = res?.predicted_label;
+//         if (lbl && MATERIALS[lbl]) return lbl;
+//         return fallback;
+//       };
+
+//       setOverride((o) => ({
+//         wall: tryMap(wallRes, o.wall),
+//         floor: tryMap(floorRes, o.floor),
+//         ceiling: tryMap(ceilRes, o.ceiling),
+//       }));
+//     } catch (e) {
+//       setErr(e.message || String(e));
+//     } finally {
+//       setBusy((b) => ({ ...b, suggest: false }));
+//     }
+//   };
+
+//   const onRecommendPanels = async () => {
+//     setErr("");
+//     setAudio(null);
+//     setBusy((b) => ({ ...b, rec: true }));
+//     try {
+//       const payload = {
+//         L: Number(L), W: Number(W), H: Number(H),
+//         wall_a: Number(wall_a),
+//         floor_a: Number(floor_a),
+//         ceil_a: Number(ceil_a),
+//         exclusions: [], // normalized rects (we’ll use later in GA)
+//       };
+//       const res = await api.recommendPanels(payload);
+//       setRecommendation(res);
+//     } catch (e) {
+//       setErr(e.message || String(e));
+//     } finally {
+//       setBusy((b) => ({ ...b, rec: false }));
+//     }
+//   };
+
+//   const onGenerateAudio = async () => {
+//     setErr("");
+//     setBusy((b) => ({ ...b, audio: true }));
+//     try {
+//       if (!recommendation?.panels) throw new Error("Generate panels first.");
+//       const payload = {
+//         L: Number(L), W: Number(W), H: Number(H),
+//         wall_a: Number(wall_a),
+//         floor_a: Number(floor_a),
+//         ceil_a: Number(ceil_a),
+//         panels: recommendation.panels,
+//       };
+//       const res = await api.generateAudio(payload);
+//       setAudio(res);
+//     } catch (e) {
+//       setErr(e.message || String(e));
+//     } finally {
+//       setBusy((b) => ({ ...b, audio: false }));
+//     }
+//   };
+
+//   const canSuggest = !!imageFile && samples.wall && samples.floor && samples.ceiling;
+//   const canRecommend = !!suggestions.wall || (!imageFile && true); // allow manual without CV
+//   const canAudio = !!recommendation;
+
+//   // ---------- render helpers ----------
+//   const RectOverlay = ({ rect, color, label }) => {
+//     if (!rect) return null;
+//     const left = rect.x1 * 100;
+//     const top = rect.y1 * 100;
+//     const w = (rect.x2 - rect.x1) * 100;
+//     const h = (rect.y2 - rect.y1) * 100;
+//     return (
+//       <div
+//         style={{
+//           position: "absolute",
+//           left: `${left}%`,
+//           top: `${top}%`,
+//           width: `${w}%`,
+//           height: `${h}%`,
+//           border: `2px solid ${color}`,
+//           borderRadius: 8,
+//           boxSizing: "border-box",
+//           background: "rgba(0,0,0,0.05)",
+//         }}
+//       >
+//         <div style={{
+//           position: "absolute",
+//           left: 6,
+//           top: 6,
+//           padding: "2px 6px",
+//           borderRadius: 999,
+//           fontSize: 12,
+//           background: color,
+//           color: "#fff",
+//           fontWeight: 700,
+//         }}>
+//           {label}
+//         </div>
+//       </div>
+//     );
+//   };
+
+//   const DragOverlay = () => {
+//     if (!drag) return null;
+//     const rect = finalizeRect(drag);
+//     if (!rect) return null;
+//     return <RectOverlay rect={rect} color="#ffffff" label="Drawing" />;
+//   };
+
+//   // ---------- UI ----------
+//   return (
+//     <div style={{
+//       minHeight: "100vh",
+//       background: "radial-gradient(1000px 600px at 20% 10%, rgba(47,111,237,0.25), transparent), #0b0c10",
+//       color: "#eaeaea",
+//       padding: 24,
+//       boxSizing: "border-box",
+//     }}>
+//       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+//         <header style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+//           <div>
+//             <div style={{ fontSize: 28, fontWeight: 800 }}>AcuVisor MVP</div>
+//             <div style={{ color: "rgba(255,255,255,0.65)", fontSize: 13 }}>
+//               Flow: Upload → Sample materials → (Optional exclusions) → Recommend panels → Generate audio
+//             </div>
+//           </div>
+//           <div style={{ color: "rgba(255,255,255,0.65)", fontSize: 13 }}>
+//             Backend: <code style={{ color: "#fff" }}>{BASE}</code>
+//           </div>
+//         </header>
+
+//         {err && (
+//           <div style={{
+//             marginTop: 14,
+//             padding: 12,
+//             borderRadius: 14,
+//             background: "rgba(255,80,80,0.15)",
+//             border: "1px solid rgba(255,80,80,0.35)",
+//             color: "#ffd9d9",
+//           }}>
+//             {err}
+//           </div>
+//         )}
+
+//         <div style={{ display: "grid", gridTemplateColumns: "420px 1fr", gap: 16, marginTop: 16 }}>
+//           {/* LEFT PANEL */}
+//           <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 18, padding: 14 }}>
+//             <div style={{ fontWeight: 800, marginBottom: 10 }}>Step 1 — Inputs</div>
+
+//             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+//               <label>
+//                 <div style={{ fontSize: 12, opacity: 0.8 }}>L (m)</div>
+//                 <input value={L} onChange={(e) => setL(e.target.value)} style={inputStyle} />
+//               </label>
+//               <label>
+//                 <div style={{ fontSize: 12, opacity: 0.8 }}>W (m)</div>
+//                 <input value={W} onChange={(e) => setW(e.target.value)} style={inputStyle} />
+//               </label>
+//               <label>
+//                 <div style={{ fontSize: 12, opacity: 0.8 }}>H (m)</div>
+//                 <input value={H} onChange={(e) => setH(e.target.value)} style={inputStyle} />
+//               </label>
+//             </div>
+
+//             <div style={{ marginTop: 12 }}>
+//               <div style={{ fontWeight: 800, marginBottom: 6 }}>Step 2 — Upload room photo</div>
+//               <input
+//                 type="file"
+//                 accept="image/*"
+//                 onChange={(e) => e.target.files?.[0] && onPickImage(e.target.files[0])}
+//               />
+//               <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
+//                 Upload 1 photo for MVP. Later you can support multiple photos.
+//               </div>
+//             </div>
+
+//             <div style={{ marginTop: 12 }}>
+//               <div style={{ fontWeight: 800, marginBottom: 6 }}>Step 3 — Select material samples</div>
+//               <div style={{ display: "grid", gap: 8 }}>
+//                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+//                   <button style={btn(mode === "wall")} disabled={!imageURL} onClick={() => setMode("wall")}>Draw WALL sample</button>
+//                   <button style={btn(mode === "floor")} disabled={!imageURL} onClick={() => setMode("floor")}>Draw FLOOR sample</button>
+//                   <button style={btn(mode === "ceiling")} disabled={!imageURL} onClick={() => setMode("ceiling")}>Draw CEILING sample</button>
+//                 </div>
+
+//                 <button style={btnPrimary} disabled={!canSuggest || busy.suggest} onClick={onSuggestMaterials}>
+//                   {busy.suggest ? "Suggesting materials..." : "Suggest materials (CV) → confirm/override"}
+//                 </button>
+
+//                 <div style={{ fontSize: 12, opacity: 0.75 }}>
+//                   Tip: click a draw button, then drag a rectangle on the image.
+//                 </div>
+//               </div>
+//             </div>
+
+//             <div style={{ marginTop: 12 }}>
+//               <div style={{ fontWeight: 800, marginBottom: 6 }}>Materials (override allowed)</div>
+//               <div style={{ display: "grid", gap: 10 }}>
+//                 <MaterialRow label="Wall" value={override.wall} setValue={(v) => setOverride((o) => ({ ...o, wall: v }))} />
+//                 <MaterialRow label="Floor" value={override.floor} setValue={(v) => setOverride((o) => ({ ...o, floor: v }))} />
+//                 <MaterialRow label="Ceiling" value={override.ceiling} setValue={(v) => setOverride((o) => ({ ...o, ceiling: v }))} />
+//               </div>
+
+//               <div style={{ marginTop: 10, padding: 10, borderRadius: 14, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", fontSize: 13 }}>
+//                 Absorption used in MVP: wall_a <b>{wall_a}</b> • floor_a <b>{floor_a}</b> • ceil_a <b>{ceil_a}</b>
+//               </div>
+//             </div>
+
+//             <div style={{ marginTop: 12 }}>
+//               <div style={{ fontWeight: 800, marginBottom: 6 }}>Optional — Exclusion zones</div>
+//               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+//                 <button style={btn(mode === "exclude")} disabled={!imageURL} onClick={() => setMode("exclude")}>Draw EXCLUSION</button>
+//                 <button style={btn(false)} disabled={exclusions.length === 0} onClick={() => setExclusions([])}>Clear exclusions</button>
+//               </div>
+//               <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
+//                 You can skip this in MVP if you want. It’s optional.
+//               </div>
+//             </div>
+
+//             <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
+//               <button style={btnPrimary} disabled={!canRecommend || busy.rec} onClick={onRecommendPanels}>
+//                 {busy.rec ? "Running GA + MLP..." : "Recommend panels (GA + MLP)"}
+//               </button>
+
+//               <button style={btnPrimary} disabled={!canAudio || busy.audio} onClick={onGenerateAudio}>
+//                 {busy.audio ? "Generating audio..." : "Generate audio (clap + speech)"}
+//               </button>
+
+//               <button style={btn(false)} onClick={clearAll}>
+//                 Reset session
+//               </button>
+//             </div>
+//           </div>
+
+//           {/* RIGHT PANEL */}
+//           <div style={{ display: "grid", gap: 16 }}>
+//             {/* Image + overlays */}
+//             <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 18, padding: 14 }}>
+//               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+//                 <div style={{ fontWeight: 800 }}>Room photo</div>
+//                 <div style={{ opacity: 0.7, fontSize: 12 }}>Mode: {mode || "none"}</div>
+//               </div>
+
+//               {!imageURL ? (
+//                 <div style={{ marginTop: 12, padding: 18, borderRadius: 16, border: "1px dashed rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.7)" }}>
+//                   Upload a room image to start selecting samples.
+//                 </div>
+//               ) : (
+//                 <div style={{ marginTop: 12, position: "relative" }}>
+//                   <img ref={imgRef} src={imageURL} alt="room" style={{ width: "100%", borderRadius: 16, display: "block" }} />
+//                   <div
+//                     ref={overlayRef}
+//                     onMouseDown={onMouseDown}
+//                     onMouseMove={onMouseMove}
+//                     onMouseUp={onMouseUp}
+//                     style={{
+//                       position: "absolute",
+//                       inset: 0,
+//                       borderRadius: 16,
+//                       cursor: mode ? "crosshair" : "default",
+//                     }}
+//                   >
+//                     <RectOverlay rect={samples.wall} color="#2f6fed" label="WALL" />
+//                     <RectOverlay rect={samples.floor} color="#2fbf71" label="FLOOR" />
+//                     <RectOverlay rect={samples.ceiling} color="#f2b84b" label="CEILING" />
+//                     {exclusions.map((r, i) => (
+//                       <RectOverlay key={i} rect={r} color="#ff5a5a" label={`EXCL ${i+1}`} />
+//                     ))}
+//                     <DragOverlay />
+//                   </div>
+//                 </div>
+//               )}
+//             </div>
+
+//             {/* Panels + audio */}
+//             <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 18, padding: 14 }}>
+//               <div style={{ fontWeight: 800, marginBottom: 10 }}>Predictions</div>
+
+//               {!recommendation ? (
+//                 <div style={{ opacity: 0.75 }}>Click “Recommend panels” to see placements.</div>
+//               ) : (
+//                 <>
+//                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+//                     <Kpi label="Used coverage" value={fmt(recommendation.used_coverage)} />
+//                     {"rt60_before" in recommendation && <Kpi label="RT60 before (pred)" value={`${fmt(recommendation.rt60_before)} s`} />}
+//                     {"rt60_after" in recommendation && <Kpi label="RT60 after (pred)" value={`${fmt(recommendation.rt60_after)} s`} />}
+//                     {"rt60_delta" in recommendation && <Kpi label="ΔRT60 (pred)" value={`${fmt(recommendation.rt60_delta)} s`} />}
+//                   </div>
+
+//                   <PanelView panels={recommendation.panels || []} title="Recommended panels (2D + pseudo-3D)" />
+//                 </>
+//               )}
+
+//               {audio && (
+//                 <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
+//                   <div style={{ fontWeight: 800 }}>Audio (Auralisation)</div>
+//                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+//                     <Kpi label="RT60 before (audio)" value={`${fmt(audio.rt60_before)} s`} />
+//                     <Kpi label="RT60 after (audio)" value={`${fmt(audio.rt60_after)} s`} />
+//                     <Kpi label="ΔRT60 (audio)" value={`${fmt(audio.rt60_delta)} s`} />
+//                   </div>
+
+//                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+//                     <AudioCard title="Clap (Before)" url={`${BASE}${audio.clap_before_audio}`} />
+//                     <AudioCard title="Clap (After)" url={`${BASE}${audio.clap_after_audio}`} />
+//                     <AudioCard title="Speech (Before)" url={`${BASE}${audio.speech_before_audio}`} />
+//                     <AudioCard title="Speech (After)" url={`${BASE}${audio.speech_after_audio}`} />
+//                   </div>
+//                 </div>
+//               )}
+//             </div>
+//           </div>
+//         </div>
+
+//         <div style={{ marginTop: 14, opacity: 0.65, fontSize: 12 }}>
+//           MVP note: CV suggestions are sample-based (3 rectangles). Users can override materials before GA+MLP optimisation.
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+
+// function MaterialRow({ label, value, setValue }) {
+//   return (
+//     <label style={{ display: "grid", gap: 6 }}>
+//       <div style={{ fontSize: 12, opacity: 0.85 }}>{label} material</div>
+//       <select value={value} onChange={(e) => setValue(e.target.value)} style={selectStyle}>
+//         {Object.entries(MATERIALS).map(([k, v]) => (
+//           <option key={k} value={k}>
+//             {v.label} (a={v.a})
+//           </option>
+//         ))}
+//       </select>
+//     </label>
+//   );
+// }
+
+// function Kpi({ label, value }) {
+//   return (
+//     <div style={{
+//       padding: 10,
+//       borderRadius: 14,
+//       background: "rgba(255,255,255,0.06)",
+//       border: "1px solid rgba(255,255,255,0.08)",
+//       minWidth: 160,
+//     }}>
+//       <div style={{ fontSize: 12, opacity: 0.8 }}>{label}</div>
+//       <div style={{ fontSize: 18, fontWeight: 900 }}>{value}</div>
+//     </div>
+//   );
+// }
+
+// function AudioCard({ title, url }) {
+//   return (
+//     <div style={{ padding: 10, borderRadius: 14, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
+//       <div style={{ fontWeight: 800, marginBottom: 6 }}>{title}</div>
+//       <audio controls src={url} style={{ width: "100%" }} />
+//       <div style={{ fontSize: 11, opacity: 0.7, marginTop: 6 }}>{url}</div>
+//     </div>
+//   );
+// }
+
+// const inputStyle = {
+//   width: "100%",
+//   padding: 10,
+//   borderRadius: 12,
+//   border: "1px solid rgba(255,255,255,0.18)",
+//   background: "rgba(0,0,0,0.25)",
+//   color: "#fff",
+//   outline: "none",
+// };
+
+// const selectStyle = {
+//   width: "100%",
+//   padding: 10,
+//   borderRadius: 12,
+//   border: "1px solid rgba(255,255,255,0.18)",
+//   background: "rgba(0,0,0,0.25)",
+//   color: "#fff",
+//   outline: "none",
+// };
+
+// const btn = (active) => ({
+//   padding: "10px 12px",
+//   borderRadius: 12,
+//   border: active ? "1px solid rgba(47,111,237,0.8)" : "1px solid rgba(255,255,255,0.18)",
+//   background: active ? "rgba(47,111,237,0.25)" : "rgba(0,0,0,0.25)",
+//   color: "#fff",
+//   cursor: "pointer",
+//   fontWeight: 800,
+// });
+
+// const btnPrimary = {
+//   padding: "12px 12px",
+//   borderRadius: 12,
+//   border: "1px solid rgba(255,255,255,0.20)",
+//   background: "linear-gradient(135deg, rgba(47,111,237,0.9), rgba(47,111,237,0.55))",
+//   color: "#fff",
+//   cursor: "pointer",
+//   fontWeight: 900,
+// };
+
+// 
+
+
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { 
+  Upload, Maximize, Box, Ban, Play, Pause, CheckCircle, 
+  BarChart3, Download, ArrowRight, Cpu, Volume2, Layers, 
+  Info, PenTool, Eraser, Wand2, RefreshCw
+} from 'lucide-react';
+
+// --- API HANDLING ---
+const BASE = "http://127.0.0.1:8000";
+
+const api = {
+  suggestMaterial: async (fd) => {
+    const res = await fetch(`${BASE}/suggest-material`, {
+      method: "POST",
+      body: fd,
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return await res.json();
+  },
+
+  recommendPanels: async (payload) => {
+    const res = await fetch(`${BASE}/recommend-panels`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return await res.json();
+  },
+
+  generateAudio: async (payload) => {
+    const res = await fetch(`${BASE}/generate-audio`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return await res.json();
+  },
+};
+
+// --- CONSTANTS ---
 const MATERIALS = {
   painted_plaster: { label: "Painted plaster", a: 0.07 },
   gypsum: { label: "Gypsum board", a: 0.10 },
   concrete: { label: "Concrete", a: 0.03 },
   wood: { label: "Wood", a: 0.20 },
   carpet: { label: "Carpet", a: 0.45 },
+  tile: { label: "Tile", a: 0.05 },
+  brick: { label: "Brick", a: 0.04 },
+  glass: { label: "Glass", a: 0.02 },
+  curtain: { label: "Curtain", a: 0.35 },
 };
 
-const BASE = "http://127.0.0.1:8000";
+function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+function fmt(x, d = 3) { return typeof x === "number" && isFinite(x) ? x.toFixed(d) : "-"; }
 
-function clamp01(x) {
-  return Math.max(0, Math.min(1, x));
-}
+// --- COMPONENTS ---
 
-function fmt(x, d = 3) {
-  return typeof x === "number" && isFinite(x) ? x.toFixed(d) : "-";
-}
+const Header = () => (
+  <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-50">
+    <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div onClick={() => window.location.reload()}
+      className="flex items-center gap-2 cursor-pointer select-none">
+        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+          <Layers className="text-white w-5 h-5" />
+        </div>
+        <span className="text-xl font-bold tracking-tight">AcuVisor</span>
+      </div>
+      <nav className="hidden md:flex gap-6 text-sm text-slate-400">
+        <a href="#" className="hover:text-white transition-colors">How it Works</a>
+        <a href="#" className="hover:text-white transition-colors">About</a>
+      </nav>
+    </div>
+  </header>
+);
 
-export default function App() {
-  // ---------- inputs ----------
-  const [L, setL] = useState(5.2);
-  const [W, setW] = useState(4.1);
-  const [H, setH] = useState(2.8);
+const Hero = ({ onStart }) => (
+  <div className="min-h-[calc(95vh-1.1rem)] flex flex-col items-center justify-center text-center px-4 bg-gradient-to-b from-slate-900 to-slate-950 text-white animate-fade-in">
+    <div className="w-full max-w-4xl space-y-8">
+      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-900/30 border border-blue-800 text-blue-400 text-xs font-medium uppercase tracking-wider">
+        AI-Powered Acoustic Engineering
+      </div>
+      <h1 className="text-5xl md:text-7xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-slate-400">
+        Professional Sound.<br />
+        <span className="text-blue-500">Simplified.</span>
+      </h1>
+      <p className="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
+        Transform your room's acoustics using computer vision.
+        Upload a photo, sample your materials, and get optimized panel placement.
+      </p>
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+        <button 
+          onClick={onStart}
+          className="group relative px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold text-white transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40 flex items-center gap-2"
+        >
+          Analyze My Room
+          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
-  // ---------- image upload ----------
-  const [imageFile, setImageFile] = useState(null);
-  const [imageURL, setImageURL] = useState("");
-  const imgRef = useRef(null);
-  const overlayRef = useRef(null);
-
-  // ---------- rectangle selection mode ----------
-  // mode: "wall" | "floor" | "ceiling" | "exclude" | null
-  const [mode, setMode] = useState(null);
-  const [drag, setDrag] = useState(null); // {x0,y0,x1,y1} in normalized coords
-
-  // samples: {wall:{x1,y1,x2,y2}, floor:..., ceiling:...}
-  const [samples, setSamples] = useState({
-    wall: null,
-    floor: null,
-    ceiling: null,
-  });
-
-  const [exclusions, setExclusions] = useState([]); // array of rects
-
-  // ---------- material suggestion + override ----------
-  const [suggestions, setSuggestions] = useState({
-    wall: null,
-    floor: null,
-    ceiling: null,
-  });
-
-  const [override, setOverride] = useState({
-    wall: "painted_plaster",
-    floor: "wood",
-    ceiling: "painted_plaster",
-  });
-
-  const wall_a = useMemo(() => MATERIALS[override.wall].a, [override.wall]);
-  const floor_a = useMemo(() => MATERIALS[override.floor].a, [override.floor]);
-  const ceil_a = useMemo(() => MATERIALS[override.ceiling].a, [override.ceiling]);
-
-  // ---------- outputs ----------
-  const [recommendation, setRecommendation] = useState(null);
-  const [audio, setAudio] = useState(null);
-
-  // ---------- UI state ----------
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState({ suggest: false, rec: false, audio: false });
-
-  // ---------- handlers ----------
-  const onPickImage = (file) => {
-    setImageFile(file);
-    const url = URL.createObjectURL(file);
-    setImageURL(url);
-    setSamples({ wall: null, floor: null, ceiling: null });
-    setExclusions([]);
-    setSuggestions({ wall: null, floor: null, ceiling: null });
-    setRecommendation(null);
-    setAudio(null);
+// --- STEP 1: INPUTS ---
+const InputStep = ({ L, setL, W, setW, H, setH, onPickImage, imageFile, onNext }) => {
+  const handleDrop = (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      onPickImage(e.dataTransfer.files[0]);
+    }
   };
 
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      onPickImage(e.target.files[0]);
+    }
+  };
+
+  const isFormValid = L && W && H && imageFile;
+
+  return (
+    <div className="max-w-3xl mx-auto py-12 px-4 animate-slide-up">
+      <div className="space-y-2 mb-8">
+        <h2 className="text-3xl font-bold text-slate-900">Room Configuration</h2>
+        <p className="text-slate-500">Enter dimensions and upload a photo to begin.</p>
+      </div>
+
+      <div className="grid gap-8">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold">
+            <Maximize className="w-5 h-5 text-blue-600" />
+            <h3>Dimensions (Meters)</h3>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { label: 'Length', val: L, set: setL },
+              { label: 'Width', val: W, set: setW },
+              { label: 'Height', val: H, set: setH }
+            ].map((field) => (
+              <div key={field.label} className="space-y-1">
+                <label className="text-xs font-medium text-slate-500 uppercase">{field.label}</label>
+                <input
+                  type="number"
+                  value={field.val}
+                  onChange={(e) => field.set(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold">
+            <Upload className="w-5 h-5 text-blue-600" />
+            <h3>Room Image</h3>
+          </div>
+          <div 
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+            className="border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-slate-50 transition-colors cursor-pointer relative"
+          >
+            <input 
+              type="file" 
+              accept="image/*" 
+              onChange={handleFileChange}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            {imageFile ? (
+              <div className="flex items-center gap-2 text-green-600 bg-green-50 px-4 py-2 rounded-full">
+                <CheckCircle className="w-5 h-5" />
+                <span className="font-medium">{imageFile.name}</span>
+              </div>
+            ) : (
+              <>
+                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-3">
+                  <Upload className="w-6 h-6" />
+                </div>
+                <p className="text-slate-900 font-medium">Click to upload or drag and drop</p>
+                <p className="text-sm text-slate-500 mt-1">Supports JPG, PNG</p>
+              </>
+            )}
+          </div>
+        </div>
+
+        <button
+          disabled={!isFormValid}
+          onClick={onNext}
+          className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
+            isFormValid 
+              ? 'bg-blue-600 text-white shadow-lg hover:bg-blue-500' 
+              : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+          }`}
+        >
+          Next: Calibration
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// --- STEP 2: CALIBRATION (Drawing Samples) ---
+const CalibrationStep = ({ 
+  imageURL, mode, setMode, samples, setSamples, exclusions, setExclusions,
+  override, setOverride,
+  suggested, hasSuggested,
+  materialCandidates,
+  onSuggestMaterials, busy, err, onAnalyze
+}) => {
+  const imgRef = useRef(null);
+  const overlayRef = useRef(null);
+  const [drag, setDrag] = useState(null);
+
+  // --- Drawing Logic ---
   const getNormPos = (evt) => {
     const box = overlayRef.current.getBoundingClientRect();
     const x = clamp01((evt.clientX - box.left) / box.width);
@@ -91,8 +802,7 @@ export default function App() {
   };
 
   const onMouseDown = (evt) => {
-    if (!mode) return;
-    if (!imageURL) return;
+    if (!mode || !imageURL) return;
     const { x, y } = getNormPos(evt);
     setDrag({ x0: x, y0: y, x1: x, y1: y });
   };
@@ -108,10 +818,7 @@ export default function App() {
     const x2 = Math.max(r.x0, r.x1);
     const y1 = Math.min(r.y0, r.y1);
     const y2 = Math.max(r.y0, r.y1);
-
-    // ignore tiny boxes
     if ((x2 - x1) < 0.03 || (y2 - y1) < 0.03) return null;
-
     return { x1, y1, x2, y2 };
   };
 
@@ -125,120 +832,11 @@ export default function App() {
       setExclusions((xs) => [...xs, rect]);
     } else {
       setSamples((s) => ({ ...s, [mode]: rect }));
+      setMode(null);
     }
   };
 
-  const clearAll = () => {
-    setSamples({ wall: null, floor: null, ceiling: null });
-    setExclusions([]);
-    setSuggestions({ wall: null, floor: null, ceiling: null });
-    setRecommendation(null);
-    setAudio(null);
-    setErr("");
-  };
-
-  const callSuggestOne = async (surface) => {
-    if (!imageFile) throw new Error("Upload an image first.");
-    const rect = samples[surface];
-    if (!rect) throw new Error(`Draw a ${surface} sample rectangle first.`);
-
-    // use center of rectangle as click x,y
-    const cx = (rect.x1 + rect.x2) / 2;
-    const cy = (rect.y1 + rect.y2) / 2;
-    const boxSize = Math.round(Math.max((rect.x2 - rect.x1), (rect.y2 - rect.y1)) * 600);
-    const box_size = Math.max(96, Math.min(512, boxSize));
-
-    const fd = new FormData();
-    fd.append("image", imageFile);
-    fd.append("surface", surface);         // wall/floor/ceiling
-    fd.append("x", String(cx));            // normalized 0..1
-    fd.append("y", String(cy));            // normalized 0..1
-    fd.append("box_size", String(box_size));
-
-    const res = await api.suggestMaterial(fd);
-    return res; // expected {surface, predicted_label, confidence?, absorption? ...}
-  };
-
-  const onSuggestMaterials = async () => {
-    setErr("");
-    setBusy((b) => ({ ...b, suggest: true }));
-    try {
-      const wallRes = await callSuggestOne("wall");
-      const floorRes = await callSuggestOne("floor");
-      const ceilRes = await callSuggestOne("ceiling");
-
-      setSuggestions({
-        wall: wallRes,
-        floor: floorRes,
-        ceiling: ceilRes,
-      });
-
-      // If backend returns a label that matches our keys, auto-select it:
-      const tryMap = (res, fallback) => {
-        const lbl = res?.predicted_label;
-        if (lbl && MATERIALS[lbl]) return lbl;
-        return fallback;
-      };
-
-      setOverride((o) => ({
-        wall: tryMap(wallRes, o.wall),
-        floor: tryMap(floorRes, o.floor),
-        ceiling: tryMap(ceilRes, o.ceiling),
-      }));
-    } catch (e) {
-      setErr(e.message || String(e));
-    } finally {
-      setBusy((b) => ({ ...b, suggest: false }));
-    }
-  };
-
-  const onRecommendPanels = async () => {
-    setErr("");
-    setAudio(null);
-    setBusy((b) => ({ ...b, rec: true }));
-    try {
-      const payload = {
-        L: Number(L), W: Number(W), H: Number(H),
-        wall_a: Number(wall_a),
-        floor_a: Number(floor_a),
-        ceil_a: Number(ceil_a),
-        exclusions: exclusions, // normalized rects (we’ll use later in GA)
-      };
-      const res = await api.recommendPanels(payload);
-      setRecommendation(res);
-    } catch (e) {
-      setErr(e.message || String(e));
-    } finally {
-      setBusy((b) => ({ ...b, rec: false }));
-    }
-  };
-
-  const onGenerateAudio = async () => {
-    setErr("");
-    setBusy((b) => ({ ...b, audio: true }));
-    try {
-      if (!recommendation?.panels) throw new Error("Generate panels first.");
-      const payload = {
-        L: Number(L), W: Number(W), H: Number(H),
-        wall_a: Number(wall_a),
-        floor_a: Number(floor_a),
-        ceil_a: Number(ceil_a),
-        panels: recommendation.panels,
-      };
-      const res = await api.generateAudio(payload);
-      setAudio(res);
-    } catch (e) {
-      setErr(e.message || String(e));
-    } finally {
-      setBusy((b) => ({ ...b, audio: false }));
-    }
-  };
-
-  const canSuggest = !!imageFile && samples.wall && samples.floor && samples.ceiling;
-  const canRecommend = !!suggestions.wall || (!imageFile && true); // allow manual without CV
-  const canAudio = !!recommendation;
-
-  // ---------- render helpers ----------
+  // Render Helpers
   const RectOverlay = ({ rect, color, label }) => {
     if (!rect) return null;
     const left = rect.x1 * 100;
@@ -246,332 +844,587 @@ export default function App() {
     const w = (rect.x2 - rect.x1) * 100;
     const h = (rect.y2 - rect.y1) * 100;
     return (
-      <div
-        style={{
-          position: "absolute",
-          left: `${left}%`,
-          top: `${top}%`,
-          width: `${w}%`,
-          height: `${h}%`,
-          border: `2px solid ${color}`,
-          borderRadius: 8,
-          boxSizing: "border-box",
-          background: "rgba(0,0,0,0.05)",
-        }}
-      >
-        <div style={{
-          position: "absolute",
-          left: 6,
-          top: 6,
-          padding: "2px 6px",
-          borderRadius: 999,
-          fontSize: 12,
-          background: color,
-          color: "#fff",
-          fontWeight: 700,
-        }}>
+      <div style={{ position: "absolute", left: `${left}%`, top: `${top}%`, width: `${w}%`, height: `${h}%`, border: `2px solid ${color}`, borderRadius: 4, background: "rgba(255,255,255,0.1)", pointerEvents: 'none' }}>
+        <div style={{ position: "absolute", top: -20, left: 0, padding: "2px 6px", borderRadius: 4, fontSize: 10, background: color, color: "#fff", fontWeight: 700 }}>
           {label}
         </div>
       </div>
     );
   };
 
-  const DragOverlay = () => {
-    if (!drag) return null;
-    const rect = finalizeRect(drag);
-    if (!rect) return null;
-    return <RectOverlay rect={rect} color="#ffffff" label="Drawing" />;
-  };
+  const canSuggest = samples.wall && samples.floor && samples.ceiling;
 
-  // ---------- UI ----------
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "radial-gradient(1000px 600px at 20% 10%, rgba(47,111,237,0.25), transparent), #0b0c10",
-      color: "#eaeaea",
-      padding: 24,
-      boxSizing: "border-box",
-    }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+    <div className="max-w-6xl mx-auto py-8 px-4 animate-slide-up h-[calc(100vh-100px)]">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+        
+        {/* Left: Tools */}
+        <div className="lg:col-span-1 flex flex-col gap-6 overflow-y-auto pr-2">
           <div>
-            <div style={{ fontSize: 28, fontWeight: 800 }}>AcuVisor MVP</div>
-            <div style={{ color: "rgba(255,255,255,0.65)", fontSize: 13 }}>
-              Flow: Upload → Sample materials → (Optional exclusions) → Recommend panels → Generate audio
-            </div>
-          </div>
-          <div style={{ color: "rgba(255,255,255,0.65)", fontSize: 13 }}>
-            Backend: <code style={{ color: "#fff" }}>{BASE}</code>
-          </div>
-        </header>
-
-        {err && (
-          <div style={{
-            marginTop: 14,
-            padding: 12,
-            borderRadius: 14,
-            background: "rgba(255,80,80,0.15)",
-            border: "1px solid rgba(255,80,80,0.35)",
-            color: "#ffd9d9",
-          }}>
-            {err}
-          </div>
-        )}
-
-        <div style={{ display: "grid", gridTemplateColumns: "420px 1fr", gap: 16, marginTop: 16 }}>
-          {/* LEFT PANEL */}
-          <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 18, padding: 14 }}>
-            <div style={{ fontWeight: 800, marginBottom: 10 }}>Step 1 — Inputs</div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-              <label>
-                <div style={{ fontSize: 12, opacity: 0.8 }}>L (m)</div>
-                <input value={L} onChange={(e) => setL(e.target.value)} style={inputStyle} />
-              </label>
-              <label>
-                <div style={{ fontSize: 12, opacity: 0.8 }}>W (m)</div>
-                <input value={W} onChange={(e) => setW(e.target.value)} style={inputStyle} />
-              </label>
-              <label>
-                <div style={{ fontSize: 12, opacity: 0.8 }}>H (m)</div>
-                <input value={H} onChange={(e) => setH(e.target.value)} style={inputStyle} />
-              </label>
-            </div>
-
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>Step 2 — Upload room photo</div>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => e.target.files?.[0] && onPickImage(e.target.files[0])}
-              />
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
-                Upload 1 photo for MVP. Later you can support multiple photos.
-              </div>
-            </div>
-
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>Step 3 — Select material samples</div>
-              <div style={{ display: "grid", gap: 8 }}>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button style={btn(mode === "wall")} disabled={!imageURL} onClick={() => setMode("wall")}>Draw WALL sample</button>
-                  <button style={btn(mode === "floor")} disabled={!imageURL} onClick={() => setMode("floor")}>Draw FLOOR sample</button>
-                  <button style={btn(mode === "ceiling")} disabled={!imageURL} onClick={() => setMode("ceiling")}>Draw CEILING sample</button>
-                </div>
-
-                <button style={btnPrimary} disabled={!canSuggest || busy.suggest} onClick={onSuggestMaterials}>
-                  {busy.suggest ? "Suggesting materials..." : "Suggest materials (CV) → confirm/override"}
-                </button>
-
-                <div style={{ fontSize: 12, opacity: 0.75 }}>
-                  Tip: click a draw button, then drag a rectangle on the image.
-                </div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>Materials (override allowed)</div>
-              <div style={{ display: "grid", gap: 10 }}>
-                <MaterialRow label="Wall" value={override.wall} setValue={(v) => setOverride((o) => ({ ...o, wall: v }))} />
-                <MaterialRow label="Floor" value={override.floor} setValue={(v) => setOverride((o) => ({ ...o, floor: v }))} />
-                <MaterialRow label="Ceiling" value={override.ceiling} setValue={(v) => setOverride((o) => ({ ...o, ceiling: v }))} />
-              </div>
-
-              <div style={{ marginTop: 10, padding: 10, borderRadius: 14, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", fontSize: 13 }}>
-                Absorption used in MVP: wall_a <b>{wall_a}</b> • floor_a <b>{floor_a}</b> • ceil_a <b>{ceil_a}</b>
-              </div>
-            </div>
-
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>Optional — Exclusion zones</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button style={btn(mode === "exclude")} disabled={!imageURL} onClick={() => setMode("exclude")}>Draw EXCLUSION</button>
-                <button style={btn(false)} disabled={exclusions.length === 0} onClick={() => setExclusions([])}>Clear exclusions</button>
-              </div>
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
-                You can skip this in MVP if you want. It’s optional.
-              </div>
-            </div>
-
-            <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
-              <button style={btnPrimary} disabled={!canRecommend || busy.rec} onClick={onRecommendPanels}>
-                {busy.rec ? "Running GA + MLP..." : "Recommend panels (GA + MLP)"}
-              </button>
-
-              <button style={btnPrimary} disabled={!canAudio || busy.audio} onClick={onGenerateAudio}>
-                {busy.audio ? "Generating audio..." : "Generate audio (clap + speech)"}
-              </button>
-
-              <button style={btn(false)} onClick={clearAll}>
-                Reset session
-              </button>
-            </div>
+            <h2 className="text-2xl font-bold text-slate-900">Calibration</h2>
+            <p className="text-slate-500 text-sm">Draw rectangles on the image to sample materials or exclude areas.</p>
           </div>
 
-          {/* RIGHT PANEL */}
-          <div style={{ display: "grid", gap: 16 }}>
-            {/* Image + overlays */}
-            <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 18, padding: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <div style={{ fontWeight: 800 }}>Room photo</div>
-                <div style={{ opacity: 0.7, fontSize: 12 }}>Mode: {mode || "none"}</div>
-              </div>
-
-              {!imageURL ? (
-                <div style={{ marginTop: 12, padding: 18, borderRadius: 16, border: "1px dashed rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.7)" }}>
-                  Upload a room image to start selecting samples.
-                </div>
-              ) : (
-                <div style={{ marginTop: 12, position: "relative" }}>
-                  <img ref={imgRef} src={imageURL} alt="room" style={{ width: "100%", borderRadius: 16, display: "block" }} />
-                  <div
-                    ref={overlayRef}
-                    onMouseDown={onMouseDown}
-                    onMouseMove={onMouseMove}
-                    onMouseUp={onMouseUp}
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      borderRadius: 16,
-                      cursor: mode ? "crosshair" : "default",
-                    }}
-                  >
-                    <RectOverlay rect={samples.wall} color="#2f6fed" label="WALL" />
-                    <RectOverlay rect={samples.floor} color="#2fbf71" label="FLOOR" />
-                    <RectOverlay rect={samples.ceiling} color="#f2b84b" label="CEILING" />
-                    {exclusions.map((r, i) => (
-                      <RectOverlay key={i} rect={r} color="#ff5a5a" label={`EXCL ${i+1}`} />
-                    ))}
-                    <DragOverlay />
-                  </div>
-                </div>
-              )}
+          {err && (
+            <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm">
+              {err}
             </div>
+          )}
 
-            {/* Panels + audio */}
-            <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 18, padding: 14 }}>
-              <div style={{ fontWeight: 800, marginBottom: 10 }}>Predictions</div>
+          {/* Tools */}
+          <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+             <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide flex items-center gap-2">
+               <PenTool className="w-4 h-4" /> Sampling Tools
+             </h3>
+             <div className="grid grid-cols-2 gap-2">
+               {[
+                 { id: 'wall', label: 'Wall', color: 'bg-blue-600' },
+                 { id: 'floor', label: 'Floor', color: 'bg-green-600' },
+                 { id: 'ceiling', label: 'Ceiling', color: 'bg-yellow-500' },
+                 { id: 'exclude', label: 'Exclude', color: 'bg-red-500' }
+               ].map((tool) => (
+                 <button
+                    key={tool.id}
+                    onClick={() => setMode(tool.id)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border flex items-center gap-2 ${
+                      mode === tool.id 
+                        ? 'bg-slate-800 text-white border-slate-800 ring-2 ring-offset-1 ring-slate-400' 
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                 >
+                   <div className={`w-2 h-2 rounded-full ${tool.color}`}></div>
+                   {tool.label}
+                 </button>
+               ))}
+               <button onClick={() => { setSamples({wall:null, floor:null, ceiling:null}); setExclusions([]); }} className="col-span-2 text-xs text-red-500 hover:underline flex items-center justify-center gap-1 mt-2">
+                 <Eraser className="w-3 h-3" /> Clear All
+               </button>
+             </div>
+          </div>
 
-              {!recommendation ? (
-                <div style={{ opacity: 0.75 }}>Click “Recommend panels” to see placements.</div>
+          {/* Materials */}
+          <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex-1">
+             <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide flex items-center gap-2">
+               <Layers className="w-4 h-4" /> Material Properties
+             </h3>
+             
+             <button
+               disabled={!canSuggest || busy.suggest}
+               onClick={onSuggestMaterials}
+               className={`w-full py-2 rounded-lg text-sm font-medium border flex items-center justify-center gap-2 transition-all ${
+                 busy.suggest 
+                    ? 'bg-slate-100 text-slate-400 cursor-wait'
+                    : canSuggest
+                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                        : 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
+               }`}
+             >
+               {busy.suggest ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+               Auto-Suggest Materials
+             </button>
+
+             {!hasSuggested ? (
+                <div className="text-sm text-slate-500">
+                  After drawing Wall/Floor/Ceiling samples, click <b>Auto-Suggest Materials</b>.
+                </div>
               ) : (
                 <>
-                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-                    <Kpi label="Used coverage" value={fmt(recommendation.used_coverage)} />
-                    {"rt60_before" in recommendation && <Kpi label="RT60 before (pred)" value={`${fmt(recommendation.rt60_before)} s`} />}
-                    {"rt60_after" in recommendation && <Kpi label="RT60 after (pred)" value={`${fmt(recommendation.rt60_after)} s`} />}
-                    {"rt60_delta" in recommendation && <Kpi label="ΔRT60 (pred)" value={`${fmt(recommendation.rt60_delta)} s`} />}
+                  <div className="text-xs text-slate-500">
+                    Materials suggested by AI. Override if incorrect.
                   </div>
 
-                  <PanelView panels={recommendation.panels || []} title="Recommended panels (2D + pseudo-3D)" />
+                  <div className="space-y-3 pt-2">
+                    {['wall', 'floor', 'ceiling'].map(surf => {
+                      const sug = suggested?.[surf];
+                      const user = override[surf];
+                      const changed = sug && user !== sug;
+                      const candidates = materialCandidates?.[surf];
+
+                      return (
+                        <div key={surf}>
+                          <label className="text-xs font-medium text-slate-500 uppercase mb-1 block">
+                            {surf}
+                          </label>
+
+                          {sug && (
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <div className="text-slate-500">
+                                Suggested:{" "}
+                                <span className="font-semibold text-slate-700">
+                                  {MATERIALS[sug]?.label ?? sug}
+                                </span>{" "}
+                                <span className="text-slate-400">
+                                  (a={MATERIALS[sug]?.a})
+                                </span>
+                              </div>
+
+                              {changed && (
+                                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">
+                                  overridden
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          <select
+                            value={user}
+                            onChange={(e) =>
+                              setOverride(prev => ({ ...prev, [surf]: e.target.value }))
+                            }
+                            className="w-full text-sm p-2 rounded border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                          >
+                            {candidates && candidates.length > 0 ? (
+                              candidates.map((cand) => (
+                                <option key={cand.label} value={cand.label}>
+                                  {cand.display_name || MATERIALS[cand.label]?.label || cand.label}
+                                  {" "}(a={cand.alpha || MATERIALS[cand.label]?.a || "?"})
+                                  {cand.label === sug && " ⭐"}
+                                </option>
+                              ))
+                            ) : (
+                              Object.entries(MATERIALS).map(([k, v]) => (
+                                <option key={k} value={k}>
+                                  {v.label} (a={v.a})
+                                </option>
+                              ))
+                            )}
+                          </select>
+
+                          {candidates && candidates.length > 1 && (
+                            <div className="mt-2 p-2 bg-slate-50 rounded text-xs space-y-1">
+                              <div className="font-semibold text-slate-600">All options:</div>
+                              {candidates.slice(0, 5).map((cand, idx) => (
+                                <div key={idx} className="flex justify-between items-center">
+                                  <span className="text-slate-700">
+                                    {idx + 1}. {cand.display_name || cand.label}
+                                  </span>
+                                  <span className="text-slate-400">{(cand.confidence * 100).toFixed(0)}%</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </>
               )}
-
-              {audio && (
-                <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
-                  <div style={{ fontWeight: 800 }}>Audio (Auralisation)</div>
-                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                    <Kpi label="RT60 before (audio)" value={`${fmt(audio.rt60_before)} s`} />
-                    <Kpi label="RT60 after (audio)" value={`${fmt(audio.rt60_after)} s`} />
-                    <Kpi label="ΔRT60 (audio)" value={`${fmt(audio.rt60_delta)} s`} />
-                  </div>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <AudioCard title="Clap (Before)" url={`${BASE}${audio.clap_before_audio}`} />
-                    <AudioCard title="Clap (After)" url={`${BASE}${audio.clap_after_audio}`} />
-                    <AudioCard title="Speech (Before)" url={`${BASE}${audio.speech_before_audio}`} />
-                    <AudioCard title="Speech (After)" url={`${BASE}${audio.speech_after_audio}`} />
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
+
+          <button
+            onClick={onAnalyze}
+            disabled={busy.rec}
+            className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-500 transition-all disabled:opacity-50 disabled:cursor-wait"
+          >
+            {busy.rec ? 'Running Analysis...' : 'Generate Recommendations'}
+          </button>
         </div>
 
-        <div style={{ marginTop: 14, opacity: 0.65, fontSize: 12 }}>
-          MVP note: CV suggestions are sample-based (3 rectangles). Users can override materials before GA+MLP optimisation.
+        {/* Right: Image Canvas */}
+        <div className="lg:col-span-2 bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden relative shadow-2xl flex items-center justify-center">
+            <div className="relative w-full h-full flex items-center justify-center p-4">
+               {imageURL ? (
+                 <div className="relative inline-block max-w-full max-h-full">
+                    <img ref={imgRef} src={imageURL} alt="Room" className="max-w-full max-h-[80vh] rounded-lg shadow-lg block select-none" draggable={false} />
+                    <div
+                      ref={overlayRef}
+                      onMouseDown={onMouseDown}
+                      onMouseMove={onMouseMove}
+                      onMouseUp={onMouseUp}
+                      className={`absolute inset-0 z-10 rounded-lg ${mode ? 'cursor-crosshair' : 'cursor-default'}`}
+                    >
+                       <RectOverlay rect={samples.wall} color="#2563eb" label="WALL" />
+                       <RectOverlay rect={samples.floor} color="#16a34a" label="FLOOR" />
+                       <RectOverlay rect={samples.ceiling} color="#eab308" label="CEILING" />
+                       {exclusions.map((r, i) => (
+                         <RectOverlay key={i} rect={r} color="#ef4444" label={`EXCL ${i+1}`} />
+                       ))}
+                       {drag && (() => {
+                          const r = finalizeRect(drag);
+                          return r ? <RectOverlay rect={r} color="#ffffff" label="Drawing..." /> : null;
+                       })()}
+                    </div>
+                 </div>
+               ) : (
+                 <div className="text-slate-500">No Image Loaded</div>
+               )}
+               
+               {mode && (
+                 <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-800/90 text-white px-4 py-2 rounded-full text-sm font-medium backdrop-blur-sm border border-slate-700 shadow-xl animate-bounce">
+                    Draw rectangle for {mode.toUpperCase()}
+                 </div>
+               )}
+            </div>
         </div>
+
       </div>
     </div>
   );
-}
+};
 
-function MaterialRow({ label, value, setValue }) {
+// --- STEP 3: DASHBOARD ---
+const Dashboard = ({ recommendation, audio, busy, onGenerateAudio, onReset }) => {
+  const [activeAudio, setActiveAudio] = useState(null);
+
+  if (!recommendation) return null;
+
   return (
-    <label style={{ display: "grid", gap: 6 }}>
-      <div style={{ fontSize: 12, opacity: 0.85 }}>{label} material</div>
-      <select value={value} onChange={(e) => setValue(e.target.value)} style={selectStyle}>
-        {Object.entries(MATERIALS).map(([k, v]) => (
-          <option key={k} value={k}>
-            {v.label} (a={v.a})
-          </option>
-        ))}
-      </select>
-    </label>
+    <div className="max-w-7xl mx-auto px-4 py-8 animate-fade-in">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">Analysis Results</h2>
+          <p className="text-slate-500">AI-optimized treatment plan based on your geometry and materials.</p>
+        </div>
+        <div className="flex gap-3">
+            <button onClick={onReset} className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors">
+              New Session
+            </button>
+            <button className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 font-medium rounded-lg hover:bg-blue-100 transition-colors">
+              <Download className="w-4 h-4" /> Export Report
+            </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Column 1: Metrics & Audio */}
+        <div className="space-y-6">
+           {/* Key Metrics */}
+           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+             <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+               <BarChart3 className="w-5 h-5 text-blue-600" /> Acoustic Metrics (Predicted)
+             </h3>
+             <div className="space-y-6">
+                <div>
+                   <div className="flex justify-between text-sm mb-1 font-medium">
+                      <span className="text-slate-500">Reverberation Time (RT60)</span>
+                      <span className="text-green-600">{fmt(recommendation.rt60_after)}s</span>
+                   </div>
+                   <div className="h-3 bg-slate-100 rounded-full overflow-hidden relative">
+                      <div className="absolute top-0 bottom-0 bg-red-300 w-1" style={{ left: '80%' }}></div> 
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '40%' }}></div>
+                   </div>
+                   <div className="flex justify-between text-xs mt-2 text-slate-400">
+                      <span>Before: {fmt(recommendation.rt60_before)}s</span>
+                      <span>Coverage Used: {fmt(recommendation.used_coverage * 100, 0)}%</span>
+                   </div>
+                </div>
+             </div>
+           </div>
+
+           {/* Audio Generation */}
+           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+             <div className="flex items-center gap-2 mb-4">
+                <Volume2 className="w-5 h-5 text-purple-600" />
+                <h3 className="font-bold text-slate-900">Auralization</h3>
+             </div>
+             
+             {!audio ? (
+               <div className="text-center py-6">
+                  <p className="text-sm text-slate-500 mb-4">Listen to the difference before buying panels.</p>
+                  <button 
+                    onClick={onGenerateAudio}
+                    disabled={busy.audio}
+                    className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {busy.audio ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Play className="w-4 h-4" />}
+                    Generate Audio Simulation
+                  </button>
+               </div>
+             ) : (
+               <div className="space-y-4">
+                  <AudioPlayer type="Clap Test" label="Before" isPlaying={activeAudio === 'clap_b'} onToggle={() => setActiveAudio(activeAudio === 'clap_b' ? null : 'clap_b')} />
+                  <AudioPlayer type="Clap Test" label="After" isPlaying={activeAudio === 'clap_a'} onToggle={() => setActiveAudio(activeAudio === 'clap_a' ? null : 'clap_a')} />
+                  <div className="border-t border-slate-100 my-2"></div>
+                  <AudioPlayer type="Speech" label="Before" isPlaying={activeAudio === 'speech_b'} onToggle={() => setActiveAudio(activeAudio === 'speech_b' ? null : 'speech_b')} />
+                  <AudioPlayer type="Speech" label="After" isPlaying={activeAudio === 'speech_a'} onToggle={() => setActiveAudio(activeAudio === 'speech_a' ? null : 'speech_a')} />
+               </div>
+             )}
+           </div>
+        </div>
+
+        {/* Column 2: Panel Recommendations */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+            <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <Box className="w-5 h-5 text-blue-600" /> Recommended Treatment Plan
+            </h3>
+            
+            <div className="grid gap-4">
+               {recommendation.panels && recommendation.panels.map((panel, idx) => (
+                 <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors">
+                    <div className="flex items-center gap-4">
+                       <div className="w-12 h-12 bg-white border border-slate-200 rounded-lg flex items-center justify-center font-bold text-xl text-slate-700 shadow-sm">
+                         {panel.count}
+                       </div>
+                       <div>
+                          <div className="font-bold text-slate-900 text-lg">{panel.type || "Acoustic Panel"}</div>
+                          <div className="text-sm text-slate-500 flex items-center gap-2">
+                            <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-xs">{panel.mount || "Wall"} Mount</span>
+                            {panel.notes && <span>{panel.notes}</span>}
+                          </div>
+                       </div>
+                    </div>
+                    <div className="hidden sm:block">
+                       <div className="w-4 h-4 rounded-full bg-blue-500"></div>
+                    </div>
+                 </div>
+               ))}
+            </div>
+
+            <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-100 flex gap-3">
+               <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+               <div className="text-sm text-blue-800">
+                  <strong>Installation Tip:</strong> Place broadband absorbers at first reflection points (mirror points) on side walls. Bass traps should go in vertical corners floor-to-ceiling if possible.
+               </div>
+            </div>
+        </div>
+
+      </div>
+    </div>
   );
-}
+};
 
-function Kpi({ label, value }) {
+const AudioPlayer = ({ type, label, isPlaying, onToggle }) => (
+  <div className={`p-3 rounded-lg border transition-all flex items-center justify-between ${isPlaying ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100'}`}>
+    <div className="flex items-center gap-3">
+       <button 
+        onClick={onToggle}
+        className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+          isPlaying ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+        }`}
+      >
+        {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-1" />}
+      </button>
+      <div>
+        <div className="text-xs text-slate-500 uppercase font-bold tracking-wider">{type}</div>
+        <div className="text-sm font-semibold text-slate-900">{label} Treatment</div>
+      </div>
+    </div>
+    {isPlaying && (
+       <div className="flex gap-0.5 h-4 items-end">
+          {[...Array(5)].map((_,i) => (
+             <div key={i} className="w-1 bg-indigo-400 animate-pulse" style={{height: `${Math.random()*100}%`}}></div>
+          ))}
+       </div>
+    )}
+  </div>
+);
+
+// --- MAIN APP ---
+
+export default function App() {
+  const [step, setStep] = useState(0); 
+
+  // --- STATE ---
+  const [L, setL] = useState(5.2);
+  const [W, setW] = useState(4.1);
+  const [H, setH] = useState(2.8);
+  
+  const [imageFile, setImageFile] = useState(null);
+  const [imageURL, setImageURL] = useState("");
+  
+  // Calibration State
+  const [mode, setMode] = useState(null);
+  const [samples, setSamples] = useState({ wall: null, floor: null, ceiling: null });
+  const [exclusions, setExclusions] = useState([]);
+  const [override, setOverride] = useState({ wall: "painted_plaster", floor: "wood", ceiling: "painted_plaster" });
+  const [suggested, setSuggested] = useState({ wall: null, floor: null, ceiling: null });
+  const [hasSuggested, setHasSuggested] = useState(false);
+  const [materialCandidates, setMaterialCandidates] = useState({ wall: null, floor: null, ceiling: null });
+  
+  // API State
+  const [busy, setBusy] = useState({ suggest: false, rec: false, audio: false });
+  const [err, setErr] = useState("");
+  const [recommendation, setRecommendation] = useState(null);
+  const [audio, setAudio] = useState(null);
+
+  // Derived Values
+  const wall_a = useMemo(() => MATERIALS[override.wall]?.a || 0.07, [override.wall]);
+  const floor_a = useMemo(() => MATERIALS[override.floor]?.a || 0.20, [override.floor]);
+  const ceil_a = useMemo(() => MATERIALS[override.ceiling]?.a || 0.07, [override.ceiling]);
+
+  // Handlers
+  const onPickImage = (file) => {
+    setImageFile(file);
+    const url = URL.createObjectURL(file);
+    setImageURL(url);
+    setSamples({ wall: null, floor: null, ceiling: null });
+    setExclusions([]);
+    setRecommendation(null);
+    setAudio(null);
+    setSuggested({ wall: null, floor: null, ceiling: null });
+    setHasSuggested(false);
+    setMaterialCandidates({ wall: null, floor: null, ceiling: null });
+  };
+
+  const callSuggestOne = async (surface) => {
+    const rect = samples[surface];
+    if (!rect) throw new Error(`Draw a ${surface} sample rectangle first.`);
+    const cx = (rect.x1 + rect.x2) / 2;
+    const cy = (rect.y1 + rect.y2) / 2;
+    const box_size = 256; 
+
+    const fd = new FormData();
+    fd.append("image", imageFile);
+    fd.append("surface", surface);
+    fd.append("x", String(cx));
+    fd.append("y", String(cy));
+    fd.append("box_size", String(box_size));
+
+    return await api.suggestMaterial(fd);
+  };
+
+  const onSuggestMaterials = async () => {
+    setErr("");
+    setBusy(b => ({ ...b, suggest: true }));
+
+    try {
+      const wallRes  = await callSuggestOne("wall");
+      const floorRes = await callSuggestOne("floor");
+      const ceilRes  = await callSuggestOne("ceiling");
+
+      const extractLabel = (res) =>
+        res?.suggested_label ??
+        res?.predicted_label ??
+        res?.label ??
+        null;
+
+      const mapLabel = (res, fallback) => {
+        const raw = extractLabel(res);
+        if (!raw) return fallback;
+        const norm = raw.toLowerCase().replace(/\s+/g, "_").trim();
+        return MATERIALS[norm] ? norm : fallback;
+      };
+
+      const wallLabel  = mapLabel(wallRes, override.wall);
+      const floorLabel = mapLabel(floorRes, override.floor);
+      const ceilLabel  = mapLabel(ceilRes, override.ceiling);
+
+      // Store candidates
+      setMaterialCandidates({
+        wall: wallRes?.candidates || null,
+        floor: floorRes?.candidates || null,
+        ceiling: ceilRes?.candidates || null
+      });
+
+      // Update dropdown values
+      setOverride({
+        wall: wallLabel,
+        floor: floorLabel,
+        ceiling: ceilLabel,
+      });
+
+      // Store suggested values
+      setSuggested({
+        wall: wallLabel,
+        floor: floorLabel,
+        ceiling: ceilLabel,
+      });
+
+      setHasSuggested(true);
+
+    } catch (e) {
+      setErr(e.message || String(e));
+    } finally {
+      setBusy(b => ({ ...b, suggest: false }));
+    }
+  };
+
+  const onRecommendPanels = async () => {
+    setErr("");
+    setBusy(b => ({ ...b, rec: true }));
+    try {
+      const payload = {
+        L: Number(L), W: Number(W), H: Number(H),
+        wall_a: Number(wall_a), floor_a: Number(floor_a), ceil_a: Number(ceil_a),
+        exclusions: exclusions
+      };
+      const res = await api.recommendPanels(payload);
+      setRecommendation(res);
+      setStep(3);
+    } catch (e) {
+      setErr(e.message || String(e));
+    } finally {
+      setBusy(b => ({ ...b, rec: false }));
+    }
+  };
+
+  const onGenerateAudio = async () => {
+    setErr("");
+    setBusy(b => ({ ...b, audio: true }));
+    try {
+      if (!recommendation?.panels) throw new Error("No panels to simulate.");
+      const payload = {
+        L: Number(L), W: Number(W), H: Number(H),
+        wall_a: Number(wall_a), floor_a: Number(floor_a), ceil_a: Number(ceil_a),
+        panels: recommendation.panels,
+      };
+      const res = await api.generateAudio(payload);
+      setAudio(res);
+    } catch (e) {
+      setErr(e.message || String(e));
+    } finally {
+      setBusy(b => ({ ...b, audio: false }));
+    }
+  };
+
+  const handleReset = () => {
+     setStep(0);
+     setImageFile(null);
+     setImageURL("");
+     setRecommendation(null);
+     setAudio(null);
+     setMaterialCandidates({ wall: null, floor: null, ceiling: null });
+  };
+
   return (
-    <div style={{
-      padding: 10,
-      borderRadius: 14,
-      background: "rgba(255,255,255,0.06)",
-      border: "1px solid rgba(255,255,255,0.08)",
-      minWidth: 160,
-    }}>
-      <div style={{ fontSize: 12, opacity: 0.8 }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 900 }}>{value}</div>
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100">
+      <Header />
+      
+      <main>
+        {step === 0 && <Hero onStart={() => setStep(1)} />}
+        
+        {step === 1 && (
+          <InputStep 
+            L={L} setL={setL} W={W} setW={setW} H={H} setH={setH} 
+            imageFile={imageFile} onPickImage={onPickImage}
+            onNext={() => setStep(2)} 
+          />
+        )}
+        
+        {step === 2 && (
+          <CalibrationStep 
+            imageURL={imageURL}
+            mode={mode} setMode={setMode}
+            samples={samples} setSamples={setSamples}
+            exclusions={exclusions} setExclusions={setExclusions}
+            override={override} setOverride={setOverride}
+            suggested={suggested}
+            hasSuggested={hasSuggested}
+            materialCandidates={materialCandidates}
+            onSuggestMaterials={onSuggestMaterials}
+            busy={busy} err={err}
+            onAnalyze={onRecommendPanels}
+          />
+        )}
+        
+        {step === 3 && (
+          <Dashboard 
+            recommendation={recommendation} 
+            audio={audio} 
+            busy={busy}
+            onGenerateAudio={onGenerateAudio}
+            onReset={handleReset}
+          />
+        )}
+      </main>
+
+      <style>{`
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        .animate-slide-up { animation: slideUp 0.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
     </div>
   );
 }
-
-function AudioCard({ title, url }) {
-  return (
-    <div style={{ padding: 10, borderRadius: 14, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
-      <div style={{ fontWeight: 800, marginBottom: 6 }}>{title}</div>
-      <audio controls src={url} style={{ width: "100%" }} />
-      <div style={{ fontSize: 11, opacity: 0.7, marginTop: 6 }}>{url}</div>
-    </div>
-  );
-}
-
-const inputStyle = {
-  width: "100%",
-  padding: 10,
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.18)",
-  background: "rgba(0,0,0,0.25)",
-  color: "#fff",
-  outline: "none",
-};
-
-const selectStyle = {
-  width: "100%",
-  padding: 10,
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.18)",
-  background: "rgba(0,0,0,0.25)",
-  color: "#fff",
-  outline: "none",
-};
-
-const btn = (active) => ({
-  padding: "10px 12px",
-  borderRadius: 12,
-  border: active ? "1px solid rgba(47,111,237,0.8)" : "1px solid rgba(255,255,255,0.18)",
-  background: active ? "rgba(47,111,237,0.25)" : "rgba(0,0,0,0.25)",
-  color: "#fff",
-  cursor: "pointer",
-  fontWeight: 800,
-});
-
-const btnPrimary = {
-  padding: "12px 12px",
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.20)",
-  background: "linear-gradient(135deg, rgba(47,111,237,0.9), rgba(47,111,237,0.55))",
-  color: "#fff",
-  cursor: "pointer",
-  fontWeight: 900,
-};
