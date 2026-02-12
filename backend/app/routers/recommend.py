@@ -1,49 +1,11 @@
-# from fastapi import APIRouter
-# from pydantic import BaseModel, Field
-# from app.services.recommend_service import recommend_panels, VALID_WALLS
-
-# router = APIRouter()
-
-# class ExclusionRect(BaseModel):
-#     wall: str = Field(..., description="north|south|east|west")
-#     x1: float = Field(..., ge=0, le=1)
-#     x2: float = Field(..., ge=0, le=1)
-#     z1: float = Field(..., ge=0, le=1)
-#     z2: float = Field(..., ge=0, le=1)
-
-# class RecommendRequest(BaseModel):
-#     target_coverage: float = Field(0.5, ge=0, le=1)
-#     exclusions: list[ExclusionRect] = Field(default_factory=list)
-
-# class PanelRect(BaseModel):
-#     wall: str
-#     x1: float
-#     x2: float
-#     z1: float
-#     z2: float
-
-# class RecommendResponse(BaseModel):
-#     used_coverage: float
-#     panels: list[PanelRect]
-
-# @router.post("/recommend-panels", response_model=RecommendResponse)
-# def recommend(req: RecommendRequest):
-#     exclusions = [e.model_dump() for e in req.exclusions if e.wall in VALID_WALLS]
-#     out = recommend_panels(req.target_coverage, exclusions)
-#     return out
-
-
-# backend/app/routers/recommend.py - CORRECTED FOR ga_service.py
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List
 
-# ✅ CORRECTED: Import from ga_service (your actual file name)
 from app.services.ga_service import run_ga
 
 router = APIRouter(prefix="/recommend-panels", tags=["recommend"])
-
 
 class ExclusionRect(BaseModel):
     wall: str = Field(..., description="north|south|east|west")
@@ -51,7 +13,6 @@ class ExclusionRect(BaseModel):
     x2: float = Field(..., ge=0, le=1)
     z1: float = Field(..., ge=0, le=1)
     z2: float = Field(..., ge=0, le=1)
-
 
 class RecommendRequest(BaseModel):
     L: float = Field(..., gt=0, description="Room length (meters)")
@@ -90,18 +51,7 @@ class RecommendResponse(BaseModel):
 
 
 def _add_physical_dimensions(panel: dict, L: float, W: float, H: float) -> PanelRect:
-    """
-    Convert normalized panel coordinates to physical dimensions in meters.
-    
-    Args:
-        panel: Dict with wall, x1, x2, z1, z2 (normalized 0-1)
-        L: Room length (meters)
-        W: Room width (meters)
-        H: Room height (meters)
-    
-    Returns:
-        PanelRect with both normalized and physical dimensions
-    """
+
     wall = panel["wall"]
     
     # Determine wall dimensions
@@ -138,19 +88,11 @@ def _add_physical_dimensions(panel: dict, L: float, W: float, H: float) -> Panel
 
 @router.post("", response_model=RecommendResponse)
 async def recommend_panels(req: RecommendRequest):
-    """
-    Use genetic algorithm to optimize panel placement.
-    
-    The GA uses your ML model to predict RT60 for each layout,
-    then evolves better solutions over multiple generations.
-    
-    Returns panel layout with both normalized coords and physical dimensions.
-    """
     try:
         # Convert exclusions to dict format
         exclusions = [ex.model_dump() for ex in req.exclusions]
         
-        # 🎯 Call GA optimizer (from ga_service.py)
+        # Call GA optimizer
         result = run_ga(
             L=req.L,
             W=req.W,

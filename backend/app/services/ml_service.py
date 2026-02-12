@@ -3,7 +3,7 @@ import numpy as np
 import joblib
 from tensorflow.keras.models import load_model
 
-APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # app/
+APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ML_DIR = os.path.join(APP_DIR, "ml")
 
 MODEL_PATH = os.path.join(ML_DIR, "mlp_rt60_model.keras")

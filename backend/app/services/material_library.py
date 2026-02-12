@@ -1,6 +1,3 @@
-# Coarse material library (MVP)
-# Values are mid-band absorption coefficients (approx, simplified)
-# User confirmation step is part of the design to handle uncertainty.
 
 MATERIAL_LIBRARY = {
     "painted_plaster": {"alpha": 0.07, "display": "Painted plaster / painted wall"},
@@ -14,5 +11,4 @@ MATERIAL_LIBRARY = {
     "curtain":         {"alpha": 0.35, "display": "Curtains / fabric"},
 }
 
-# What labels the CV model is allowed to output in MVP
 MVP_LABELS = list(MATERIAL_LIBRARY.keys())
