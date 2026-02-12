@@ -576,15 +576,33 @@
 //   fontWeight: 900,
 // };
 
+// newwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
+
+
 // 
 
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-  Upload, Maximize, Box, Ban, Play, Pause, CheckCircle, 
-  BarChart3, Download, ArrowRight, Cpu, Volume2, Layers, 
-  Info, PenTool, Eraser, Wand2, RefreshCw
-} from 'lucide-react';
+import React, { useState, useRef, useMemo, useEffect } from "react";
+import {
+  Upload,
+  Maximize,
+  Box,
+  Play,
+  Pause,
+  CheckCircle,
+  BarChart3,
+  Download,
+  ArrowRight,
+  Volume2,
+  Layers,
+  Info,
+  PenTool,
+  Eraser,
+  Wand2,
+  RefreshCw,
+} from "lucide-react";
+
+import PanelView from "./components/PanelView";
 
 // --- API HANDLING ---
 const BASE = "http://127.0.0.1:8000";
@@ -601,6 +619,17 @@ const api = {
 
   recommendPanels: async (payload) => {
     const res = await fetch(`${BASE}/recommend-panels`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return await res.json();
+  },
+
+  // ✅ you said this endpoint exists in swagger
+  predictRt60: async (payload) => {
+    const res = await fetch(`${BASE}/predict-rt60`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -633,24 +662,37 @@ const MATERIALS = {
   curtain: { label: "Curtain", a: 0.35 },
 };
 
-function clamp01(x) { return Math.max(0, Math.min(1, x)); }
-function fmt(x, d = 3) { return typeof x === "number" && isFinite(x) ? x.toFixed(d) : "-"; }
+function clamp01(x) {
+  return Math.max(0, Math.min(1, x));
+}
+function fmt(x, d = 3) {
+  return typeof x === "number" && isFinite(x) ? x.toFixed(d) : "-";
+}
+function normalizeLabel(raw) {
+  return raw?.toLowerCase?.().replace(/\s+/g, "_").trim() ?? null;
+}
 
 // --- COMPONENTS ---
 
 const Header = () => (
   <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-50">
     <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-      <div onClick={() => window.location.reload()}
-      className="flex items-center gap-2 cursor-pointer select-none">
+      <div
+        onClick={() => window.location.reload()}
+        className="flex items-center gap-2 cursor-pointer select-none"
+      >
         <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
           <Layers className="text-white w-5 h-5" />
         </div>
         <span className="text-xl font-bold tracking-tight">AcuVisor</span>
       </div>
       <nav className="hidden md:flex gap-6 text-sm text-slate-400">
-        <a href="#" className="hover:text-white transition-colors">How it Works</a>
-        <a href="#" className="hover:text-white transition-colors">About</a>
+        <a href="#" className="hover:text-white transition-colors">
+          How it Works
+        </a>
+        <a href="#" className="hover:text-white transition-colors">
+          About
+        </a>
       </nav>
     </div>
   </header>
@@ -663,15 +705,16 @@ const Hero = ({ onStart }) => (
         AI-Powered Acoustic Engineering
       </div>
       <h1 className="text-5xl md:text-7xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-slate-400">
-        Professional Sound.<br />
+        Professional Sound.
+        <br />
         <span className="text-blue-500">Simplified.</span>
       </h1>
       <p className="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
-        Transform your room's acoustics using computer vision.
-        Upload a photo, sample your materials, and get optimized panel placement.
+        Upload a photo, sample your materials, and get optimized panel placement +
+        before/after audio.
       </p>
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-        <button 
+        <button
           onClick={onStart}
           className="group relative px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold text-white transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40 flex items-center gap-2"
         >
@@ -715,9 +758,9 @@ const InputStep = ({ L, setL, W, setW, H, setH, onPickImage, imageFile, onNext }
           </div>
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: 'Length', val: L, set: setL },
-              { label: 'Width', val: W, set: setW },
-              { label: 'Height', val: H, set: setH }
+              { label: "Length", val: L, set: setL },
+              { label: "Width", val: W, set: setW },
+              { label: "Height", val: H, set: setH },
             ].map((field) => (
               <div key={field.label} className="space-y-1">
                 <label className="text-xs font-medium text-slate-500 uppercase">{field.label}</label>
@@ -737,14 +780,14 @@ const InputStep = ({ L, setL, W, setW, H, setH, onPickImage, imageFile, onNext }
             <Upload className="w-5 h-5 text-blue-600" />
             <h3>Room Image</h3>
           </div>
-          <div 
+          <div
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
             className="border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-slate-50 transition-colors cursor-pointer relative"
           >
-            <input 
-              type="file" 
-              accept="image/*" 
+            <input
+              type="file"
+              accept="image/*"
               onChange={handleFileChange}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             />
@@ -769,9 +812,7 @@ const InputStep = ({ L, setL, W, setW, H, setH, onPickImage, imageFile, onNext }
           disabled={!isFormValid}
           onClick={onNext}
           className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-            isFormValid 
-              ? 'bg-blue-600 text-white shadow-lg hover:bg-blue-500' 
-              : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+            isFormValid ? "bg-blue-600 text-white shadow-lg hover:bg-blue-500" : "bg-slate-200 text-slate-400 cursor-not-allowed"
           }`}
         >
           Next: Calibration
@@ -781,24 +822,102 @@ const InputStep = ({ L, setL, W, setW, H, setH, onPickImage, imageFile, onNext }
   );
 };
 
-// --- STEP 2: CALIBRATION (Drawing Samples) ---
-const CalibrationStep = ({ 
-  imageURL, mode, setMode, samples, setSamples, exclusions, setExclusions,
-  override, setOverride,
-  suggested, hasSuggested,
+// --- AudioPlayer (real playback) ---
+const AudioPlayer = ({ type, label, src }) => {
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+
+  const toggle = async () => {
+    const el = audioRef.current;
+    if (!el) return;
+
+    try {
+      if (!playing) {
+        await el.play();
+        setPlaying(true);
+      } else {
+        el.pause();
+        setPlaying(false);
+      }
+    } catch (e) {
+      console.error("Audio play failed:", e);
+      alert("Audio blocked or failed. Check console + ensure /static is reachable.");
+    }
+  };
+
+  return (
+    <div
+      className={`p-3 rounded-lg border transition-all flex items-center justify-between ${
+        playing ? "bg-indigo-50 border-indigo-200" : "bg-white border-slate-100"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <button
+          onClick={toggle}
+          className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+            playing ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-1" />}
+        </button>
+        <div>
+          <div className="text-xs text-slate-500 uppercase font-bold tracking-wider">{type}</div>
+          <div className="text-sm font-semibold text-slate-900">{label}</div>
+        </div>
+      </div>
+
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="auto"
+        onEnded={() => setPlaying(false)}
+      />
+    </div>
+  );
+};
+
+// --- STEP 2: CALIBRATION (Drawing Samples + Exclusions) ---
+const CalibrationStep = ({
+  imageURL,
+  mode,
+  setMode,
+  samples,
+  setSamples,
+  exclusions,
+  setExclusions,
+  pendingExcl,
+  setPendingExcl,
+
+  override,
+  setOverride,
+  suggested,
+  hasSuggested,
   materialCandidates,
-  onSuggestMaterials, busy, err, onAnalyze
+  onSuggestMaterials,
+
+  busy,
+  err,
+  canRecommend,
+  onAnalyze,
+  onClearAll,
 }) => {
-  const imgRef = useRef(null);
   const overlayRef = useRef(null);
   const [drag, setDrag] = useState(null);
 
-  // --- Drawing Logic ---
   const getNormPos = (evt) => {
     const box = overlayRef.current.getBoundingClientRect();
     const x = clamp01((evt.clientX - box.left) / box.width);
     const y = clamp01((evt.clientY - box.top) / box.height);
     return { x, y };
+  };
+
+  const finalizeRect = (r) => {
+    const x1 = Math.min(r.x0, r.x1);
+    const x2 = Math.max(r.x0, r.x1);
+    const y1 = Math.min(r.y0, r.y1);
+    const y2 = Math.max(r.y0, r.y1);
+    if (x2 - x1 < 0.03 || y2 - y1 < 0.03) return null;
+    return { x1, y1, x2, y2 };
   };
 
   const onMouseDown = (evt) => {
@@ -813,15 +932,6 @@ const CalibrationStep = ({
     setDrag((d) => ({ ...d, x1: x, y1: y }));
   };
 
-  const finalizeRect = (r) => {
-    const x1 = Math.min(r.x0, r.x1);
-    const x2 = Math.max(r.x0, r.x1);
-    const y1 = Math.min(r.y0, r.y1);
-    const y2 = Math.max(r.y0, r.y1);
-    if ((x2 - x1) < 0.03 || (y2 - y1) < 0.03) return null;
-    return { x1, y1, x2, y2 };
-  };
-
   const onMouseUp = () => {
     if (!drag) return;
     const rect = finalizeRect(drag);
@@ -829,14 +939,16 @@ const CalibrationStep = ({
     if (!rect) return;
 
     if (mode === "exclude") {
-      setExclusions((xs) => [...xs, rect]);
-    } else {
-      setSamples((s) => ({ ...s, [mode]: rect }));
+      // ✅ do NOT add directly. user must pick wall direction first.
+      setPendingExcl(rect);
       setMode(null);
+      return;
     }
+
+    setSamples((s) => ({ ...s, [mode]: rect }));
+    setMode(null);
   };
 
-  // Render Helpers
   const RectOverlay = ({ rect, color, label }) => {
     if (!rect) return null;
     const left = rect.x1 * 100;
@@ -844,8 +956,32 @@ const CalibrationStep = ({
     const w = (rect.x2 - rect.x1) * 100;
     const h = (rect.y2 - rect.y1) * 100;
     return (
-      <div style={{ position: "absolute", left: `${left}%`, top: `${top}%`, width: `${w}%`, height: `${h}%`, border: `2px solid ${color}`, borderRadius: 4, background: "rgba(255,255,255,0.1)", pointerEvents: 'none' }}>
-        <div style={{ position: "absolute", top: -20, left: 0, padding: "2px 6px", borderRadius: 4, fontSize: 10, background: color, color: "#fff", fontWeight: 700 }}>
+      <div
+        style={{
+          position: "absolute",
+          left: `${left}%`,
+          top: `${top}%`,
+          width: `${w}%`,
+          height: `${h}%`,
+          border: `2px solid ${color}`,
+          borderRadius: 6,
+          background: "rgba(255,255,255,0.08)",
+          pointerEvents: "none",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: -20,
+            left: 0,
+            padding: "2px 6px",
+            borderRadius: 4,
+            fontSize: 10,
+            background: color,
+            color: "#fff",
+            fontWeight: 700,
+          }}
+        >
           {label}
         </div>
       </div>
@@ -857,215 +993,276 @@ const CalibrationStep = ({
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 animate-slide-up h-[calc(100vh-100px)]">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
-        
         {/* Left: Tools */}
         <div className="lg:col-span-1 flex flex-col gap-6 overflow-y-auto pr-2">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">Calibration</h2>
-            <p className="text-slate-500 text-sm">Draw rectangles on the image to sample materials or exclude areas.</p>
+            <p className="text-slate-500 text-sm">
+              Draw Wall/Floor/Ceiling samples. Optionally draw exclusions (TV, window, door).
+            </p>
           </div>
 
           {err && (
-            <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm">
+            <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm whitespace-pre-wrap">
               {err}
             </div>
           )}
 
           {/* Tools */}
           <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-             <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide flex items-center gap-2">
-               <PenTool className="w-4 h-4" /> Sampling Tools
-             </h3>
-             <div className="grid grid-cols-2 gap-2">
-               {[
-                 { id: 'wall', label: 'Wall', color: 'bg-blue-600' },
-                 { id: 'floor', label: 'Floor', color: 'bg-green-600' },
-                 { id: 'ceiling', label: 'Ceiling', color: 'bg-yellow-500' },
-                 { id: 'exclude', label: 'Exclude', color: 'bg-red-500' }
-               ].map((tool) => (
-                 <button
-                    key={tool.id}
-                    onClick={() => setMode(tool.id)}
-                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border flex items-center gap-2 ${
-                      mode === tool.id 
-                        ? 'bg-slate-800 text-white border-slate-800 ring-2 ring-offset-1 ring-slate-400' 
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    }`}
-                 >
-                   <div className={`w-2 h-2 rounded-full ${tool.color}`}></div>
-                   {tool.label}
-                 </button>
-               ))}
-               <button onClick={() => { setSamples({wall:null, floor:null, ceiling:null}); setExclusions([]); }} className="col-span-2 text-xs text-red-500 hover:underline flex items-center justify-center gap-1 mt-2">
-                 <Eraser className="w-3 h-3" /> Clear All
-               </button>
-             </div>
+            <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide flex items-center gap-2">
+              <PenTool className="w-4 h-4" /> Sampling Tools
+            </h3>
+
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: "wall", label: "Wall", dot: "bg-blue-600" },
+                { id: "floor", label: "Floor", dot: "bg-green-600" },
+                { id: "ceiling", label: "Ceiling", dot: "bg-yellow-500" },
+                { id: "exclude", label: "Exclude", dot: "bg-red-500" },
+              ].map((tool) => (
+                <button
+                  key={tool.id}
+                  onClick={() => setMode(tool.id)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border flex items-center gap-2 ${
+                    mode === tool.id
+                      ? "bg-slate-800 text-white border-slate-800 ring-2 ring-offset-1 ring-slate-400"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className={`w-2 h-2 rounded-full ${tool.dot}`} />
+                  {tool.label}
+                </button>
+              ))}
+
+              <button
+                onClick={onClearAll}
+                className="col-span-2 text-xs text-red-500 hover:underline flex items-center justify-center gap-1 mt-2"
+              >
+                <Eraser className="w-3 h-3" /> Clear All
+              </button>
+            </div>
           </div>
+
+          {/* Pending exclusion wall choice */}
+          {pendingExcl && (
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+              <div className="text-sm font-semibold text-slate-800 mb-2">
+                Assign exclusion to a wall
+              </div>
+              <div className="text-xs text-slate-500 mb-3">
+                For MVP, exclusion is applied on a chosen wall plane (x,z). Pick the wall this area belongs to.
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {["north", "east", "south", "west"].map((w) => (
+                  <button
+                    key={w}
+                    onClick={() => {
+                      const r = pendingExcl;
+                      setExclusions((xs) => [
+                        ...xs,
+                        {
+                          wall: w,
+                          x1: r.x1,
+                          x2: r.x2,
+                          z1: r.y1,
+                          z2: r.y2,
+                        },
+                      ]);
+                      setPendingExcl(null);
+                    }}
+                    className="px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-sm font-medium"
+                  >
+                    {w.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setPendingExcl(null)}
+                className="mt-3 text-xs text-red-600 hover:underline"
+              >
+                Cancel exclusion
+              </button>
+            </div>
+          )}
 
           {/* Materials */}
           <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex-1">
-             <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide flex items-center gap-2">
-               <Layers className="w-4 h-4" /> Material Properties
-             </h3>
-             
-             <button
-               disabled={!canSuggest || busy.suggest}
-               onClick={onSuggestMaterials}
-               className={`w-full py-2 rounded-lg text-sm font-medium border flex items-center justify-center gap-2 transition-all ${
-                 busy.suggest 
-                    ? 'bg-slate-100 text-slate-400 cursor-wait'
-                    : canSuggest
-                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
-                        : 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
-               }`}
-             >
-               {busy.suggest ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-               Auto-Suggest Materials
-             </button>
+            <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide flex items-center gap-2">
+              <Layers className="w-4 h-4" /> Material Properties
+            </h3>
 
-             {!hasSuggested ? (
-                <div className="text-sm text-slate-500">
-                  After drawing Wall/Floor/Ceiling samples, click <b>Auto-Suggest Materials</b>.
-                </div>
+            <button
+              disabled={!canSuggest || busy.suggest}
+              onClick={onSuggestMaterials}
+              className={`w-full py-2 rounded-lg text-sm font-medium border flex items-center justify-center gap-2 transition-all ${
+                busy.suggest
+                  ? "bg-slate-100 text-slate-400 cursor-wait"
+                  : canSuggest
+                  ? "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                  : "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
+              }`}
+            >
+              {busy.suggest ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
               ) : (
-                <>
-                  <div className="text-xs text-slate-500">
-                    Materials suggested by AI. Override if incorrect.
-                  </div>
+                <Wand2 className="w-4 h-4" />
+              )}
+              Auto-Suggest Materials
+            </button>
 
-                  <div className="space-y-3 pt-2">
-                    {['wall', 'floor', 'ceiling'].map(surf => {
-                      const sug = suggested?.[surf];
-                      const user = override[surf];
-                      const changed = sug && user !== sug;
-                      const candidates = materialCandidates?.[surf];
+            {!hasSuggested ? (
+              <div className="text-sm text-slate-500">
+                After drawing Wall/Floor/Ceiling samples, click <b>Auto-Suggest Materials</b>.
+              </div>
+            ) : (
+              <>
+                <div className="text-xs text-slate-500">Suggested by AI. Override if incorrect.</div>
 
-                      return (
-                        <div key={surf}>
-                          <label className="text-xs font-medium text-slate-500 uppercase mb-1 block">
-                            {surf}
-                          </label>
+                <div className="space-y-3 pt-2">
+                  {["wall", "floor", "ceiling"].map((surf) => {
+                    const sug = suggested?.[surf];
+                    const user = override[surf];
+                    const changed = sug && user !== sug;
+                    const candidates = materialCandidates?.[surf];
 
-                          {sug && (
-                            <div className="flex items-center justify-between text-xs mb-1">
-                              <div className="text-slate-500">
-                                Suggested:{" "}
-                                <span className="font-semibold text-slate-700">
-                                  {MATERIALS[sug]?.label ?? sug}
-                                </span>{" "}
-                                <span className="text-slate-400">
-                                  (a={MATERIALS[sug]?.a})
-                                </span>
-                              </div>
+                    return (
+                      <div key={surf}>
+                        <label className="text-xs font-medium text-slate-500 uppercase mb-1 block">
+                          {surf}
+                        </label>
 
-                              {changed && (
-                                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">
-                                  overridden
-                                </span>
-                              )}
+                        {sug && (
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <div className="text-slate-500">
+                              Suggested:{" "}
+                              <span className="font-semibold text-slate-700">
+                                {MATERIALS[sug]?.label ?? sug}
+                              </span>{" "}
+                              <span className="text-slate-400">(a={MATERIALS[sug]?.a})</span>
                             </div>
-                          )}
 
-                          <select
-                            value={user}
-                            onChange={(e) =>
-                              setOverride(prev => ({ ...prev, [surf]: e.target.value }))
-                            }
-                            className="w-full text-sm p-2 rounded border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
-                          >
-                            {candidates && candidates.length > 0 ? (
-                              candidates.map((cand) => (
+                            {changed && (
+                              <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">
+                                overridden
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        <select
+                          value={user}
+                          onChange={(e) => setOverride((prev) => ({ ...prev, [surf]: e.target.value }))}
+                          className="w-full text-sm p-2 rounded border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                        >
+                          {candidates && candidates.length > 0
+                            ? candidates.map((cand) => (
                                 <option key={cand.label} value={cand.label}>
-                                  {cand.display_name || MATERIALS[cand.label]?.label || cand.label}
-                                  {" "}(a={cand.alpha || MATERIALS[cand.label]?.a || "?"})
-                                  {cand.label === sug && " ⭐"}
+                                  {(cand.display_name || MATERIALS[cand.label]?.label || cand.label) +
+                                    ` (a=${cand.alpha ?? MATERIALS[cand.label]?.a ?? "?"})` +
+                                    (cand.label === sug ? " ⭐" : "")}
                                 </option>
                               ))
-                            ) : (
-                              Object.entries(MATERIALS).map(([k, v]) => (
+                            : Object.entries(MATERIALS).map(([k, v]) => (
                                 <option key={k} value={k}>
                                   {v.label} (a={v.a})
                                 </option>
-                              ))
-                            )}
-                          </select>
-
-                          {candidates && candidates.length > 1 && (
-                            <div className="mt-2 p-2 bg-slate-50 rounded text-xs space-y-1">
-                              <div className="font-semibold text-slate-600">All options:</div>
-                              {candidates.slice(0, 5).map((cand, idx) => (
-                                <div key={idx} className="flex justify-between items-center">
-                                  <span className="text-slate-700">
-                                    {idx + 1}. {cand.display_name || cand.label}
-                                  </span>
-                                  <span className="text-slate-400">{(cand.confidence * 100).toFixed(0)}%</span>
-                                </div>
                               ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
 
+          {/* Analyze */}
           <button
             onClick={onAnalyze}
-            disabled={busy.rec}
-            className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-500 transition-all disabled:opacity-50 disabled:cursor-wait"
+            disabled={busy.rec || !canRecommend}
+            className={`w-full py-4 rounded-xl font-bold shadow-lg transition-all ${
+              busy.rec || !canRecommend
+                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                : "bg-blue-600 text-white hover:bg-blue-500"
+            }`}
           >
-            {busy.rec ? 'Running Analysis...' : 'Generate Recommendations'}
+            {busy.rec ? "Running Analysis..." : "Generate Recommendations"}
           </button>
+
+          {!canRecommend && (
+            <div className="text-xs text-slate-500">
+              To generate: enter dimensions + upload image + auto-suggest materials.
+              {pendingExcl ? " Also assign the exclusion to a wall." : ""}
+            </div>
+          )}
         </div>
 
         {/* Right: Image Canvas */}
         <div className="lg:col-span-2 bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden relative shadow-2xl flex items-center justify-center">
-            <div className="relative w-full h-full flex items-center justify-center p-4">
-               {imageURL ? (
-                 <div className="relative inline-block max-w-full max-h-full">
-                    <img ref={imgRef} src={imageURL} alt="Room" className="max-w-full max-h-[80vh] rounded-lg shadow-lg block select-none" draggable={false} />
-                    <div
-                      ref={overlayRef}
-                      onMouseDown={onMouseDown}
-                      onMouseMove={onMouseMove}
-                      onMouseUp={onMouseUp}
-                      className={`absolute inset-0 z-10 rounded-lg ${mode ? 'cursor-crosshair' : 'cursor-default'}`}
-                    >
-                       <RectOverlay rect={samples.wall} color="#2563eb" label="WALL" />
-                       <RectOverlay rect={samples.floor} color="#16a34a" label="FLOOR" />
-                       <RectOverlay rect={samples.ceiling} color="#eab308" label="CEILING" />
-                       {exclusions.map((r, i) => (
-                         <RectOverlay key={i} rect={r} color="#ef4444" label={`EXCL ${i+1}`} />
-                       ))}
-                       {drag && (() => {
-                          const r = finalizeRect(drag);
-                          return r ? <RectOverlay rect={r} color="#ffffff" label="Drawing..." /> : null;
-                       })()}
-                    </div>
-                 </div>
-               ) : (
-                 <div className="text-slate-500">No Image Loaded</div>
-               )}
-               
-               {mode && (
-                 <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-800/90 text-white px-4 py-2 rounded-full text-sm font-medium backdrop-blur-sm border border-slate-700 shadow-xl animate-bounce">
-                    Draw rectangle for {mode.toUpperCase()}
-                 </div>
-               )}
-            </div>
-        </div>
+          <div className="relative w-full h-full flex items-center justify-center p-4">
+            {imageURL ? (
+              <div className="relative inline-block max-w-full max-h-full">
+                <img
+                  src={imageURL}
+                  alt="Room"
+                  className="max-w-full max-h-[80vh] rounded-lg shadow-lg block select-none"
+                  draggable={false}
+                />
+                <div
+                  ref={overlayRef}
+                  onMouseDown={onMouseDown}
+                  onMouseMove={onMouseMove}
+                  onMouseUp={onMouseUp}
+                  className={`absolute inset-0 z-10 rounded-lg ${mode ? "cursor-crosshair" : "cursor-default"}`}
+                >
+                  <RectOverlay rect={samples.wall} color="#2563eb" label="WALL" />
+                  <RectOverlay rect={samples.floor} color="#16a34a" label="FLOOR" />
+                  <RectOverlay rect={samples.ceiling} color="#eab308" label="CEILING" />
 
+                  {/* exclusions stored as {wall,x1,x2,z1,z2} -> map back to overlay {x1,y1,x2,y2} */}
+                  {exclusions.map((r, i) => (
+                    <RectOverlay
+                      key={i}
+                      rect={{ x1: r.x1, y1: r.z1, x2: r.x2, y2: r.z2 }}
+                      color="#ef4444"
+                      label={`EXCL ${i + 1} (${r.wall.toUpperCase()})`}
+                    />
+                  ))}
+
+                  {/* pending exclusion overlay */}
+                  {pendingExcl && (
+                    <RectOverlay rect={pendingExcl} color="#ffffff" label="EXCL (choose wall)" />
+                  )}
+
+                  {/* dragging preview */}
+                  {drag &&
+                    (() => {
+                      const r = finalizeRect(drag);
+                      return r ? <RectOverlay rect={r} color="#ffffff" label="Drawing..." /> : null;
+                    })()}
+                </div>
+              </div>
+            ) : (
+              <div className="text-slate-500">No Image Loaded</div>
+            )}
+
+            {mode && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-800/90 text-white px-4 py-2 rounded-full text-sm font-medium backdrop-blur-sm border border-slate-700 shadow-xl animate-bounce">
+                Draw rectangle for {mode.toUpperCase()}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
 // --- STEP 3: DASHBOARD ---
-const Dashboard = ({ recommendation, audio, busy, onGenerateAudio, onReset }) => {
-  const [activeAudio, setActiveAudio] = useState(null);
-
+const Dashboard = ({ recommendation, rt60, audio, busy, onGenerateAudio, onReset }) => {
   if (!recommendation) return null;
 
   return (
@@ -1073,345 +1270,409 @@ const Dashboard = ({ recommendation, audio, busy, onGenerateAudio, onReset }) =>
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Analysis Results</h2>
-          <p className="text-slate-500">AI-optimized treatment plan based on your geometry and materials.</p>
+          <p className="text-slate-500">Optimized plan based on geometry + predicted materials.</p>
         </div>
         <div className="flex gap-3">
-            <button onClick={onReset} className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors">
-              New Session
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 font-medium rounded-lg hover:bg-blue-100 transition-colors">
-              <Download className="w-4 h-4" /> Export Report
-            </button>
+          <button
+            onClick={onReset}
+            className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            New Session
+          </button>
+          <button className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 font-medium rounded-lg hover:bg-blue-100 transition-colors">
+            <Download className="w-4 h-4" /> Export Report
+          </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
         {/* Column 1: Metrics & Audio */}
         <div className="space-y-6">
-           {/* Key Metrics */}
-           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-             <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-               <BarChart3 className="w-5 h-5 text-blue-600" /> Acoustic Metrics (Predicted)
-             </h3>
-             <div className="space-y-6">
-                <div>
-                   <div className="flex justify-between text-sm mb-1 font-medium">
-                      <span className="text-slate-500">Reverberation Time (RT60)</span>
-                      <span className="text-green-600">{fmt(recommendation.rt60_after)}s</span>
-                   </div>
-                   <div className="h-3 bg-slate-100 rounded-full overflow-hidden relative">
-                      <div className="absolute top-0 bottom-0 bg-red-300 w-1" style={{ left: '80%' }}></div> 
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '40%' }}></div>
-                   </div>
-                   <div className="flex justify-between text-xs mt-2 text-slate-400">
-                      <span>Before: {fmt(recommendation.rt60_before)}s</span>
-                      <span>Coverage Used: {fmt(recommendation.used_coverage * 100, 0)}%</span>
-                   </div>
-                </div>
-             </div>
-           </div>
-
-           {/* Audio Generation */}
-           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-             <div className="flex items-center gap-2 mb-4">
-                <Volume2 className="w-5 h-5 text-purple-600" />
-                <h3 className="font-bold text-slate-900">Auralization</h3>
-             </div>
-             
-             {!audio ? (
-               <div className="text-center py-6">
-                  <p className="text-sm text-slate-500 mb-4">Listen to the difference before buying panels.</p>
-                  <button 
-                    onClick={onGenerateAudio}
-                    disabled={busy.audio}
-                    className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {busy.audio ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Play className="w-4 h-4" />}
-                    Generate Audio Simulation
-                  </button>
-               </div>
-             ) : (
-               <div className="space-y-4">
-                  <AudioPlayer type="Clap Test" label="Before" isPlaying={activeAudio === 'clap_b'} onToggle={() => setActiveAudio(activeAudio === 'clap_b' ? null : 'clap_b')} />
-                  <AudioPlayer type="Clap Test" label="After" isPlaying={activeAudio === 'clap_a'} onToggle={() => setActiveAudio(activeAudio === 'clap_a' ? null : 'clap_a')} />
-                  <div className="border-t border-slate-100 my-2"></div>
-                  <AudioPlayer type="Speech" label="Before" isPlaying={activeAudio === 'speech_b'} onToggle={() => setActiveAudio(activeAudio === 'speech_b' ? null : 'speech_b')} />
-                  <AudioPlayer type="Speech" label="After" isPlaying={activeAudio === 'speech_a'} onToggle={() => setActiveAudio(activeAudio === 'speech_a' ? null : 'speech_a')} />
-               </div>
-             )}
-           </div>
-        </div>
-
-        {/* Column 2: Panel Recommendations */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-            <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
-              <Box className="w-5 h-5 text-blue-600" /> Recommended Treatment Plan
+          {/* Key Metrics */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-blue-600" /> Acoustic Metrics (Predicted)
             </h3>
-            
-            <div className="grid gap-4">
-               {recommendation.panels && recommendation.panels.map((panel, idx) => (
-                 <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors">
-                    <div className="flex items-center gap-4">
-                       <div className="w-12 h-12 bg-white border border-slate-200 rounded-lg flex items-center justify-center font-bold text-xl text-slate-700 shadow-sm">
-                         {panel.count}
-                       </div>
-                       <div>
-                          <div className="font-bold text-slate-900 text-lg">{panel.type || "Acoustic Panel"}</div>
-                          <div className="text-sm text-slate-500 flex items-center gap-2">
-                            <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-xs">{panel.mount || "Wall"} Mount</span>
-                            {panel.notes && <span>{panel.notes}</span>}
-                          </div>
-                       </div>
-                    </div>
-                    <div className="hidden sm:block">
-                       <div className="w-4 h-4 rounded-full bg-blue-500"></div>
-                    </div>
-                 </div>
-               ))}
+
+            <div className="space-y-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Panel coverage used</span>
+                <span className="font-semibold text-slate-800">{fmt(recommendation.used_coverage * 100, 1)}%</span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-slate-500">RT60 before</span>
+                <span className="font-semibold text-slate-800">{fmt(rt60?.rt60_before)}s</span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-slate-500">RT60 after</span>
+                <span className="font-semibold text-green-600">{fmt(rt60?.rt60_after)}s</span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-slate-500">Δ (before − after)</span>
+                <span className="font-semibold text-slate-800">{fmt(rt60?.rt60_delta)}s</span>
+              </div>
+
+              {!rt60 && (
+                <div className="text-xs text-slate-400">
+                  (RT60 will appear after recommendations. If blank, check /predict-rt60 endpoint.)
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Audio */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <Volume2 className="w-5 h-5 text-purple-600" />
+              <h3 className="font-bold text-slate-900">Auralization</h3>
             </div>
 
-            <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-100 flex gap-3">
-               <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-               <div className="text-sm text-blue-800">
-                  <strong>Installation Tip:</strong> Place broadband absorbers at first reflection points (mirror points) on side walls. Bass traps should go in vertical corners floor-to-ceiling if possible.
-               </div>
-            </div>
+            {!audio ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-slate-500 mb-4">
+                  Generate a before/after simulation using the predicted room response.
+                </p>
+                <button
+                  onClick={onGenerateAudio}
+                  disabled={busy.audio}
+                  className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {busy.audio ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                  Generate Audio Simulation
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <AudioPlayer type="Clap Test" label="Before" src={`${BASE}${audio.clap_before_audio}`} />
+                <AudioPlayer type="Clap Test" label="After" src={`${BASE}${audio.clap_after_audio}`} />
+                <div className="border-t border-slate-100 my-2" />
+                <AudioPlayer type="Speech" label="Before" src={`${BASE}${audio.speech_before_audio}`} />
+                <AudioPlayer type="Speech" label="After" src={`${BASE}${audio.speech_after_audio}`} />
+              </div>
+            )}
+
+            {audio && (
+              <div className="mt-3 text-xs text-slate-400">
+                If playback fails: open the audio URL in a new tab and confirm it downloads/plays.
+              </div>
+            )}
+          </div>
         </div>
 
+        {/* Column 2: Panel Layout */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+          <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
+            <Box className="w-5 h-5 text-blue-600" /> Recommended Treatment Plan
+          </h3>
+
+          {/* ✅ your pseudo-3D wall grid */}
+          <PanelView panels={recommendation.panels || []} title="Panel Layout (by wall)" />
+
+          <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-100 flex gap-3">
+            <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-blue-800">
+              <strong>MVP note:</strong> Exclusions are applied as constraints per chosen wall plane. Full 3D reconstruction from a single image is future work.
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
-const AudioPlayer = ({ type, label, isPlaying, onToggle }) => (
-  <div className={`p-3 rounded-lg border transition-all flex items-center justify-between ${isPlaying ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100'}`}>
-    <div className="flex items-center gap-3">
-       <button 
-        onClick={onToggle}
-        className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-          isPlaying ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-        }`}
-      >
-        {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-1" />}
-      </button>
-      <div>
-        <div className="text-xs text-slate-500 uppercase font-bold tracking-wider">{type}</div>
-        <div className="text-sm font-semibold text-slate-900">{label} Treatment</div>
-      </div>
-    </div>
-    {isPlaying && (
-       <div className="flex gap-0.5 h-4 items-end">
-          {[...Array(5)].map((_,i) => (
-             <div key={i} className="w-1 bg-indigo-400 animate-pulse" style={{height: `${Math.random()*100}%`}}></div>
-          ))}
-       </div>
-    )}
-  </div>
-);
-
 // --- MAIN APP ---
-
 export default function App() {
-  const [step, setStep] = useState(0); 
+  const [step, setStep] = useState(0);
 
-  // --- STATE ---
+  // Room inputs
   const [L, setL] = useState(5.2);
   const [W, setW] = useState(4.1);
   const [H, setH] = useState(2.8);
-  
+
   const [imageFile, setImageFile] = useState(null);
   const [imageURL, setImageURL] = useState("");
-  
-  // Calibration State
-  const [mode, setMode] = useState(null);
+
+  // Calibration drawing
+  const [mode, setMode] = useState(null); // wall|floor|ceiling|exclude
   const [samples, setSamples] = useState({ wall: null, floor: null, ceiling: null });
+
+  // ✅ exclusions stored in backend-ready format: {wall,x1,x2,z1,z2}
   const [exclusions, setExclusions] = useState([]);
-  const [override, setOverride] = useState({ wall: "painted_plaster", floor: "wood", ceiling: "painted_plaster" });
+
+  // ✅ pending exclusion waiting for wall selection
+  const [pendingExcl, setPendingExcl] = useState(null);
+
+  // Materials
+  const [override, setOverride] = useState({
+    wall: "painted_plaster",
+    floor: "wood",
+    ceiling: "painted_plaster",
+  });
+
   const [suggested, setSuggested] = useState({ wall: null, floor: null, ceiling: null });
   const [hasSuggested, setHasSuggested] = useState(false);
   const [materialCandidates, setMaterialCandidates] = useState({ wall: null, floor: null, ceiling: null });
-  
-  // API State
+
+  // Results
   const [busy, setBusy] = useState({ suggest: false, rec: false, audio: false });
   const [err, setErr] = useState("");
   const [recommendation, setRecommendation] = useState(null);
+  const [rt60, setRt60] = useState(null);
   const [audio, setAudio] = useState(null);
 
-  // Derived Values
+  // Derived absorption
   const wall_a = useMemo(() => MATERIALS[override.wall]?.a || 0.07, [override.wall]);
   const floor_a = useMemo(() => MATERIALS[override.floor]?.a || 0.20, [override.floor]);
   const ceil_a = useMemo(() => MATERIALS[override.ceiling]?.a || 0.07, [override.ceiling]);
 
-  // Handlers
+  // Validation rules for MVP
+  const hasDims = Number(L) > 0 && Number(W) > 0 && Number(H) > 0;
+  const hasImage = !!imageFile;
+  const canRecommend = hasDims && hasImage && hasSuggested && !pendingExcl;
+
   const onPickImage = (file) => {
     setImageFile(file);
-    const url = URL.createObjectURL(file);
-    setImageURL(url);
+    setImageURL(URL.createObjectURL(file));
+
+    // reset downstream
     setSamples({ wall: null, floor: null, ceiling: null });
     setExclusions([]);
-    setRecommendation(null);
-    setAudio(null);
+    setPendingExcl(null);
+
+    setOverride({ wall: "painted_plaster", floor: "wood", ceiling: "painted_plaster" });
     setSuggested({ wall: null, floor: null, ceiling: null });
     setHasSuggested(false);
     setMaterialCandidates({ wall: null, floor: null, ceiling: null });
+
+    setRecommendation(null);
+    setRt60(null);
+    setAudio(null);
+    setErr("");
+  };
+
+  const onClearAll = () => {
+    setSamples({ wall: null, floor: null, ceiling: null });
+    setExclusions([]);
+    setPendingExcl(null);
+
+    // ✅ make dropdowns disappear again
+    setSuggested({ wall: null, floor: null, ceiling: null });
+    setHasSuggested(false);
+    setMaterialCandidates({ wall: null, floor: null, ceiling: null });
+
+    setErr("");
   };
 
   const callSuggestOne = async (surface) => {
     const rect = samples[surface];
     if (!rect) throw new Error(`Draw a ${surface} sample rectangle first.`);
+
     const cx = (rect.x1 + rect.x2) / 2;
     const cy = (rect.y1 + rect.y2) / 2;
-    const box_size = 256; 
 
     const fd = new FormData();
     fd.append("image", imageFile);
     fd.append("surface", surface);
     fd.append("x", String(cx));
     fd.append("y", String(cy));
-    fd.append("box_size", String(box_size));
+    fd.append("box_size", String(256));
 
     return await api.suggestMaterial(fd);
   };
 
   const onSuggestMaterials = async () => {
     setErr("");
-    setBusy(b => ({ ...b, suggest: true }));
+    setBusy((b) => ({ ...b, suggest: true }));
 
     try {
-      const wallRes  = await callSuggestOne("wall");
+      const wallRes = await callSuggestOne("wall");
       const floorRes = await callSuggestOne("floor");
-      const ceilRes  = await callSuggestOne("ceiling");
+      const ceilRes = await callSuggestOne("ceiling");
 
-      const extractLabel = (res) =>
-        res?.suggested_label ??
-        res?.predicted_label ??
-        res?.label ??
-        null;
+      const extractLabel = (res) => res?.suggested_label ?? res?.predicted_label ?? res?.label ?? null;
 
       const mapLabel = (res, fallback) => {
         const raw = extractLabel(res);
-        if (!raw) return fallback;
-        const norm = raw.toLowerCase().replace(/\s+/g, "_").trim();
-        return MATERIALS[norm] ? norm : fallback;
+        const norm = normalizeLabel(raw);
+        return norm && MATERIALS[norm] ? norm : fallback;
       };
 
-      const wallLabel  = mapLabel(wallRes, override.wall);
+      const wallLabel = mapLabel(wallRes, override.wall);
       const floorLabel = mapLabel(floorRes, override.floor);
-      const ceilLabel  = mapLabel(ceilRes, override.ceiling);
+      const ceilLabel = mapLabel(ceilRes, override.ceiling);
 
-      // Store candidates
       setMaterialCandidates({
         wall: wallRes?.candidates || null,
         floor: floorRes?.candidates || null,
-        ceiling: ceilRes?.candidates || null
+        ceiling: ceilRes?.candidates || null,
       });
 
-      // Update dropdown values
-      setOverride({
-        wall: wallLabel,
-        floor: floorLabel,
-        ceiling: ceilLabel,
-      });
+      // ✅ update dropdown values to suggested
+      setOverride({ wall: wallLabel, floor: floorLabel, ceiling: ceilLabel });
 
-      // Store suggested values
-      setSuggested({
-        wall: wallLabel,
-        floor: floorLabel,
-        ceiling: ceilLabel,
-      });
+      // ✅ store suggested so we can show "overridden"
+      setSuggested({ wall: wallLabel, floor: floorLabel, ceiling: ceilLabel });
 
       setHasSuggested(true);
-
     } catch (e) {
       setErr(e.message || String(e));
     } finally {
-      setBusy(b => ({ ...b, suggest: false }));
+      setBusy((b) => ({ ...b, suggest: false }));
     }
   };
 
   const onRecommendPanels = async () => {
     setErr("");
-    setBusy(b => ({ ...b, rec: true }));
+    setBusy((b) => ({ ...b, rec: true }));
+
     try {
+      if (!canRecommend) {
+        throw new Error("Missing required steps. Make sure you auto-suggest materials and assign any pending exclusion wall.");
+      }
+
+      // ✅ include target_coverage because swagger expects it
       const payload = {
-        L: Number(L), W: Number(W), H: Number(H),
-        wall_a: Number(wall_a), floor_a: Number(floor_a), ceil_a: Number(ceil_a),
-        exclusions: exclusions
+        L: Number(L),
+        W: Number(W),
+        H: Number(H),
+        wall_a: Number(wall_a),
+        floor_a: Number(floor_a),
+        ceil_a: Number(ceil_a),
+        target_coverage: 0.5,
+        exclusions: exclusions, // already backend-ready
       };
+
       const res = await api.recommendPanels(payload);
       setRecommendation(res);
+
+      // ✅ immediately compute RT60 using predict-rt60
+      try {
+        const rtReq = {
+          L: Number(L),
+          W: Number(W),
+          H: Number(H),
+          wall_a: Number(wall_a),
+          floor_a: Number(floor_a),
+          ceil_a: Number(ceil_a),
+          panel_coverage: Number(res.used_coverage ?? 0.5),
+        };
+        const rtRes = await api.predictRt60(rtReq);
+        setRt60(rtRes);
+      } catch (rtErr) {
+        console.warn("predict-rt60 failed:", rtErr);
+        setRt60(null);
+      }
+
       setStep(3);
     } catch (e) {
       setErr(e.message || String(e));
     } finally {
-      setBusy(b => ({ ...b, rec: false }));
+      setBusy((b) => ({ ...b, rec: false }));
     }
   };
 
   const onGenerateAudio = async () => {
     setErr("");
-    setBusy(b => ({ ...b, audio: true }));
+    setBusy((b) => ({ ...b, audio: true }));
+
     try {
-      if (!recommendation?.panels) throw new Error("No panels to simulate.");
+      if (!recommendation?.panels || recommendation.panels.length === 0) {
+        throw new Error("No panels to simulate.");
+      }
+
       const payload = {
-        L: Number(L), W: Number(W), H: Number(H),
-        wall_a: Number(wall_a), floor_a: Number(floor_a), ceil_a: Number(ceil_a),
+        L: Number(L),
+        W: Number(W),
+        H: Number(H),
+        wall_a: Number(wall_a),
+        floor_a: Number(floor_a),
+        ceil_a: Number(ceil_a),
         panels: recommendation.panels,
       };
+
       const res = await api.generateAudio(payload);
       setAudio(res);
     } catch (e) {
       setErr(e.message || String(e));
     } finally {
-      setBusy(b => ({ ...b, audio: false }));
+      setBusy((b) => ({ ...b, audio: false }));
     }
   };
 
   const handleReset = () => {
-     setStep(0);
-     setImageFile(null);
-     setImageURL("");
-     setRecommendation(null);
-     setAudio(null);
-     setMaterialCandidates({ wall: null, floor: null, ceiling: null });
+    setStep(0);
+    setImageFile(null);
+    setImageURL("");
+
+    setSamples({ wall: null, floor: null, ceiling: null });
+    setExclusions([]);
+    setPendingExcl(null);
+
+    setOverride({ wall: "painted_plaster", floor: "wood", ceiling: "painted_plaster" });
+    setSuggested({ wall: null, floor: null, ceiling: null });
+    setHasSuggested(false);
+    setMaterialCandidates({ wall: null, floor: null, ceiling: null });
+
+    setRecommendation(null);
+    setRt60(null);
+    setAudio(null);
+    setErr("");
   };
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100">
       <Header />
-      
+
       <main>
         {step === 0 && <Hero onStart={() => setStep(1)} />}
-        
+
         {step === 1 && (
-          <InputStep 
-            L={L} setL={setL} W={W} setW={setW} H={H} setH={setH} 
-            imageFile={imageFile} onPickImage={onPickImage}
-            onNext={() => setStep(2)} 
+          <InputStep
+            L={L}
+            setL={setL}
+            W={W}
+            setW={setW}
+            H={H}
+            setH={setH}
+            imageFile={imageFile}
+            onPickImage={onPickImage}
+            onNext={() => setStep(2)}
           />
         )}
-        
+
         {step === 2 && (
-          <CalibrationStep 
+          <CalibrationStep
             imageURL={imageURL}
-            mode={mode} setMode={setMode}
-            samples={samples} setSamples={setSamples}
-            exclusions={exclusions} setExclusions={setExclusions}
-            override={override} setOverride={setOverride}
+            mode={mode}
+            setMode={setMode}
+            samples={samples}
+            setSamples={setSamples}
+            exclusions={exclusions}
+            setExclusions={setExclusions}
+            pendingExcl={pendingExcl}
+            setPendingExcl={setPendingExcl}
+            override={override}
+            setOverride={setOverride}
             suggested={suggested}
             hasSuggested={hasSuggested}
             materialCandidates={materialCandidates}
             onSuggestMaterials={onSuggestMaterials}
-            busy={busy} err={err}
+            busy={busy}
+            err={err}
+            canRecommend={canRecommend}
             onAnalyze={onRecommendPanels}
+            onClearAll={onClearAll}
           />
         )}
-        
+
         {step === 3 && (
-          <Dashboard 
-            recommendation={recommendation} 
-            audio={audio} 
+          <Dashboard
+            recommendation={recommendation}
+            rt60={rt60}
+            audio={audio}
             busy={busy}
             onGenerateAudio={onGenerateAudio}
             onReset={handleReset}
