@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Radio,
   Mic2,
+  Trash2,
 } from "lucide-react";
 
 import PanelView from "./components/PanelView";
@@ -83,8 +84,7 @@ const Hero = ({ onStart }) => (
         <span className="text-blue-500">Simplified.</span>
       </h1>
       <p className="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
-        Upload a photo, sample your materials, and get optimized panel placement +
-        before/after audio.
+        Upload a photo, confirm materials, place source/listener/exclusions in 3D, and get optimized acoustic treatment.
       </p>
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
         <button
@@ -99,30 +99,7 @@ const Hero = ({ onStart }) => (
   </div>
 );
 
-// --- STEP 1: INPUTS ---
-const InputStep = ({
-  L,
-  setL,
-  W,
-  setW,
-  H,
-  setH,
-  src_x,
-  setSrcX,
-  src_y,
-  setSrcY,
-  src_z,
-  setSrcZ,
-  mic_x,
-  setMicX,
-  mic_y,
-  setMicY,
-  mic_z,
-  setMicZ,
-  onPickImage,
-  imageFile,
-  onNext,
-}) => {
+const InputStep = ({ L, setL, W, setW, H, setH, onPickImage, imageFile, onNext }) => {
   const handleDrop = (e) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
@@ -142,9 +119,7 @@ const InputStep = ({
     <div className="max-w-4xl mx-auto py-12 px-4 animate-slide-up">
       <div className="space-y-2 mb-8">
         <h2 className="text-3xl font-bold text-slate-900">Room Configuration</h2>
-        <p className="text-slate-500">
-          Enter dimensions, optional source/listener positions, and upload a room photo.
-        </p>
+        <p className="text-slate-500">Enter dimensions and upload a room photo.</p>
       </div>
 
       <div className="grid gap-8">
@@ -160,67 +135,7 @@ const InputStep = ({
               { label: "Height", val: H, set: setH },
             ].map((field) => (
               <div key={field.label} className="space-y-1">
-                <label className="text-xs font-medium text-slate-500 uppercase">
-                  {field.label}
-                </label>
-                <input
-                  type="number"
-                  value={field.val}
-                  onChange={(e) => field.set(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold">
-            <Radio className="w-5 h-5 text-blue-600" />
-            <h3>Audio Source Position (Optional)</h3>
-          </div>
-          <p className="text-sm text-slate-500 mb-4">
-            These are used for before/after audio generation. Leave as default if unsure.
-          </p>
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: "Source X", val: src_x, set: setSrcX },
-              { label: "Source Y", val: src_y, set: setSrcY },
-              { label: "Source Z", val: src_z, set: setSrcZ },
-            ].map((field) => (
-              <div key={field.label} className="space-y-1">
-                <label className="text-xs font-medium text-slate-500 uppercase">
-                  {field.label}
-                </label>
-                <input
-                  type="number"
-                  value={field.val}
-                  onChange={(e) => field.set(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold">
-            <Mic2 className="w-5 h-5 text-blue-600" />
-            <h3>Listener / Microphone Position (Optional)</h3>
-          </div>
-          <p className="text-sm text-slate-500 mb-4">
-            These are used for before/after audio generation. Leave as default if unsure.
-          </p>
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: "Listener X", val: mic_x, set: setMicX },
-              { label: "Listener Y", val: mic_y, set: setMicY },
-              { label: "Listener Z", val: mic_z, set: setMicZ },
-            ].map((field) => (
-              <div key={field.label} className="space-y-1">
-                <label className="text-xs font-medium text-slate-500 uppercase">
-                  {field.label}
-                </label>
+                <label className="text-xs font-medium text-slate-500 uppercase">{field.label}</label>
                 <input
                   type="number"
                   value={field.val}
@@ -258,9 +173,7 @@ const InputStep = ({
                 <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-3">
                   <Upload className="w-6 h-6" />
                 </div>
-                <p className="text-slate-900 font-medium">
-                  Click to upload or drag and drop
-                </p>
+                <p className="text-slate-900 font-medium">Click to upload or drag and drop</p>
                 <p className="text-sm text-slate-500 mt-1">Supports JPG, PNG</p>
               </>
             )}
@@ -276,14 +189,13 @@ const InputStep = ({
               : "bg-slate-200 text-slate-400 cursor-not-allowed"
           }`}
         >
-          Next: Calibration
+          Next: Material Suggestion
         </button>
       </div>
     </div>
   );
 };
 
-// --- AudioPlayer (real playback) ---
 const AudioPlayer = ({ type, label, src }) => {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -291,7 +203,6 @@ const AudioPlayer = ({ type, label, src }) => {
   const toggle = async () => {
     const el = audioRef.current;
     if (!el) return;
-
     try {
       if (!playing) {
         await el.play();
@@ -324,34 +235,22 @@ const AudioPlayer = ({ type, label, src }) => {
           {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-1" />}
         </button>
         <div>
-          <div className="text-xs text-slate-500 uppercase font-bold tracking-wider">
-            {type}
-          </div>
+          <div className="text-xs text-slate-500 uppercase font-bold tracking-wider">{type}</div>
           <div className="text-sm font-semibold text-slate-900">{label}</div>
         </div>
       </div>
 
-      <audio
-        ref={audioRef}
-        src={src}
-        preload="auto"
-        onEnded={() => setPlaying(false)}
-      />
+      <audio ref={audioRef} src={src} preload="auto" onEnded={() => setPlaying(false)} />
     </div>
   );
 };
 
-// --- CALIBRATION (Drawing Samples + Exclusions) ---
-const CalibrationStep = ({
+const MaterialStep = ({
   imageURL,
   mode,
   setMode,
   samples,
   setSamples,
-  exclusions,
-  setExclusions,
-  pendingExcl,
-  setPendingExcl,
   override,
   setOverride,
   suggested,
@@ -360,9 +259,8 @@ const CalibrationStep = ({
   onSuggestMaterials,
   busy,
   err,
-  canRecommend,
-  onAnalyze,
   onClearAll,
+  onNext,
 }) => {
   const overlayRef = useRef(null);
   const [drag, setDrag] = useState(null);
@@ -400,13 +298,6 @@ const CalibrationStep = ({
     const rect = finalizeRect(drag);
     setDrag(null);
     if (!rect) return;
-
-    if (mode === "exclude") {
-      setPendingExcl(rect);
-      setMode(null);
-      return;
-    }
-
     setSamples((s) => ({ ...s, [mode]: rect }));
     setMode(null);
   };
@@ -451,15 +342,16 @@ const CalibrationStep = ({
   };
 
   const canSuggest = samples.wall && samples.floor && samples.ceiling;
+  const canContinue = hasSuggested;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 lg:py-8 animate-slide-up min-h-[calc(100dvh-4rem-1px)] lg:h-[calc(100dvh-4rem-1px)]">
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:h-full">
         <div className="flex flex-col gap-6 lg:col-span-1 lg:min-h-0 lg:overflow-y-auto lg:pr-2">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">Calibration</h2>
+            <h2 className="text-2xl font-bold text-slate-900">Material Suggestion</h2>
             <p className="text-slate-500 text-sm">
-              Draw Wall/Floor/Ceiling samples. Optionally draw exclusions (TV, window, door).
+              Current fallback flow: draw wall/floor/ceiling samples, then confirm or override suggested materials.
             </p>
           </div>
 
@@ -479,7 +371,6 @@ const CalibrationStep = ({
                 { id: "wall", label: "Wall", dot: "bg-blue-600" },
                 { id: "floor", label: "Floor", dot: "bg-green-600" },
                 { id: "ceiling", label: "Ceiling", dot: "bg-yellow-500" },
-                { id: "exclude", label: "Exclude", dot: "bg-red-500" },
               ].map((tool) => (
                 <button
                   key={tool.id}
@@ -504,49 +395,6 @@ const CalibrationStep = ({
             </div>
           </div>
 
-          {pendingExcl && (
-            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-              <div className="text-sm font-semibold text-slate-800 mb-2">
-                Assign exclusion to a wall
-              </div>
-              <div className="text-xs text-slate-500 mb-3">
-                For MVP, exclusion is applied on a chosen wall plane (x,z). Pick the wall this area belongs to.
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {["north", "east", "south", "west"].map((w) => (
-                  <button
-                    key={w}
-                    onClick={() => {
-                      const r = pendingExcl;
-                      setExclusions((xs) => [
-                        ...xs,
-                        {
-                          wall: w,
-                          x1: r.x1,
-                          x2: r.x2,
-                          z1: r.y1,
-                          z2: r.y2,
-                        },
-                      ]);
-                      setPendingExcl(null);
-                    }}
-                    className="px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-sm font-medium"
-                  >
-                    {w.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-
-              <button
-                onClick={() => setPendingExcl(null)}
-                className="mt-3 text-xs text-red-600 hover:underline"
-              >
-                Cancel exclusion
-              </button>
-            </div>
-          )}
-
           <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex-1">
             <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide flex items-center gap-2">
               <Layers className="w-4 h-4" /> Material Properties
@@ -563,11 +411,7 @@ const CalibrationStep = ({
                   : "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
               }`}
             >
-              {busy.suggest ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <Wand2 className="w-4 h-4" />
-              )}
+              {busy.suggest ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
               Auto-Suggest Materials
             </button>
 
@@ -601,11 +445,8 @@ const CalibrationStep = ({
                               <span className="font-semibold text-slate-700">
                                 {MATERIALS[sug]?.label ?? sug}
                               </span>{" "}
-                              <span className="text-slate-400">
-                                (a={MATERIALS[sug]?.a})
-                              </span>
+                              <span className="text-slate-400">(a={MATERIALS[sug]?.a})</span>
                             </div>
-
                             {changed && (
                               <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">
                                 overridden
@@ -646,23 +487,16 @@ const CalibrationStep = ({
           </div>
 
           <button
-            onClick={onAnalyze}
-            disabled={busy.rec || !canRecommend}
+            onClick={onNext}
+            disabled={!canContinue}
             className={`w-full py-4 rounded-xl font-bold shadow-lg transition-all ${
-              busy.rec || !canRecommend
-                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                : "bg-blue-600 text-white hover:bg-blue-500"
+              canContinue
+                ? "bg-blue-600 text-white hover:bg-blue-500"
+                : "bg-slate-200 text-slate-400 cursor-not-allowed"
             }`}
           >
-            {busy.rec ? "Running Analysis..." : "Generate Recommendations"}
+            Next: 3D Room Editor
           </button>
-
-          {!canRecommend && (
-            <div className="text-xs text-slate-500">
-              To generate: enter dimensions + upload image + auto-suggest materials.
-              {pendingExcl ? " Also assign the exclusion to a wall." : ""}
-            </div>
-          )}
         </div>
 
         <div className="lg:col-span-2 bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden relative shadow-2xl flex items-center justify-center">
@@ -676,31 +510,15 @@ const CalibrationStep = ({
                   draggable={false}
                 />
                 <div
-                  ref={overlayRef}
+                  className={`absolute inset-0 z-10 rounded-lg ${mode ? "cursor-crosshair" : "cursor-default"}`}
                   onMouseDown={onMouseDown}
                   onMouseMove={onMouseMove}
                   onMouseUp={onMouseUp}
-                  className={`absolute inset-0 z-10 rounded-lg ${
-                    mode ? "cursor-crosshair" : "cursor-default"
-                  }`}
+                  ref={overlayRef}
                 >
                   <RectOverlay rect={samples.wall} color="#2563eb" label="WALL" />
                   <RectOverlay rect={samples.floor} color="#16a34a" label="FLOOR" />
                   <RectOverlay rect={samples.ceiling} color="#eab308" label="CEILING" />
-
-                  {exclusions.map((r, i) => (
-                    <RectOverlay
-                      key={i}
-                      rect={{ x1: r.x1, y1: r.z1, x2: r.x2, y2: r.z2 }}
-                      color="#ef4444"
-                      label={`EXCL ${i + 1} (${r.wall.toUpperCase()})`}
-                    />
-                  ))}
-
-                  {pendingExcl && (
-                    <RectOverlay rect={pendingExcl} color="#ffffff" label="EXCL (choose wall)" />
-                  )}
-
                   {drag &&
                     (() => {
                       const r = finalizeRect(drag);
@@ -724,7 +542,294 @@ const CalibrationStep = ({
   );
 };
 
-// --- STEP 3: DASHBOARD ---
+const EditorStep = ({
+  L,
+  W,
+  H,
+  source,
+  setSource,
+  listener,
+  setListener,
+  exclusions,
+  setExclusions,
+  onBack,
+  onNext,
+}) => {
+  const [editTool, setEditTool] = useState("source");
+  const [exWidth, setExWidth] = useState(0.8);
+  const [exHeight, setExHeight] = useState(0.8);
+
+  const clampPointValue = (rawValue, max) => {
+    const numeric = Number(rawValue);
+    if (!Number.isFinite(numeric)) return 0.05;
+    return Number(Math.max(0.05, Math.min(numeric, Math.max(Number(max) - 0.05, 0.05))).toFixed(2));
+  };
+
+  const updatePoint = (setter, axis, value, max) => {
+    setter((prev) => ({
+      ...prev,
+      [axis]: clampPointValue(value, max),
+    }));
+  };
+
+  const removeExclusion = (idx) => {
+    setExclusions((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const renderPointEditor = (label, point, setPoint, tone, tool) => (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold text-slate-900">{label}</div>
+          <div className="text-xs text-slate-500">x = room length, y = room width, z = height</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setEditTool(tool)}
+          className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${tone}`}
+        >
+          Place In 3D
+        </button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            X ({fmt(Number(L), 1)}m max)
+          </label>
+          <input
+            type="number"
+            min="0.05"
+            max={Math.max(Number(L) - 0.05, 0.05)}
+            step="0.1"
+            value={point.x}
+            onChange={(e) => updatePoint(setPoint, "x", e.target.value, L)}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-800"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Y ({fmt(Number(W), 1)}m max)
+          </label>
+          <input
+            type="number"
+            min="0.05"
+            max={Math.max(Number(W) - 0.05, 0.05)}
+            step="0.1"
+            value={point.y}
+            onChange={(e) => updatePoint(setPoint, "y", e.target.value, W)}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-800"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Z ({fmt(Number(H), 1)}m max)
+          </label>
+          <input
+            type="number"
+            min="0.05"
+            max={Math.max(Number(H) - 0.05, 0.05)}
+            step="0.1"
+            value={point.z}
+            onChange={(e) => updatePoint(setPoint, "z", e.target.value, H)}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-800"
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-7xl mx-auto py-8 px-4 animate-slide-up">
+      <div className="grid lg:grid-cols-[0.92fr_1.08fr] gap-8">
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">3D Room Editor</h2>
+            <p className="text-slate-500 text-sm">
+              The room box uses your L x W x H dimensions directly. Use top view for source/listener placement and wall views for exclusions.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+            <div>
+              <h3 className="font-semibold text-slate-900">Editing Tools</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                While placing items, camera drag is locked so clicks land accurately inside the room.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                onClick={() => setEditTool("source")}
+                className={`px-3 py-2 rounded-lg border text-sm font-medium ${
+                  editTool === "source"
+                    ? "bg-emerald-600 text-white border-emerald-600"
+                    : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                Place Source
+              </button>
+              <button
+                onClick={() => setEditTool("listener")}
+                className={`px-3 py-2 rounded-lg border text-sm font-medium ${
+                  editTool === "listener"
+                    ? "bg-violet-600 text-white border-violet-600"
+                    : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                Place Listener
+              </button>
+              <button
+                onClick={() => setEditTool("exclusion")}
+                className={`px-3 py-2 rounded-lg border text-sm font-medium ${
+                  editTool === "exclusion"
+                    ? "bg-red-600 text-white border-red-600"
+                    : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                Add Exclusion
+              </button>
+            </div>
+
+            {editTool === "exclusion" && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-amber-900">
+                  Exclusion Size Preview
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs uppercase tracking-wide text-amber-800 block mb-1">
+                      Width On Wall (m)
+                    </label>
+                    <input
+                      type="number"
+                      min="0.2"
+                      step="0.1"
+                      value={exWidth}
+                      onChange={(e) => setExWidth(Number(e.target.value))}
+                      className="w-full px-3 py-2 rounded-lg border border-amber-200 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs uppercase tracking-wide text-amber-800 block mb-1">
+                      Height On Wall (m)
+                    </label>
+                    <input
+                      type="number"
+                      min="0.2"
+                      step="0.1"
+                      value={exHeight}
+                      onChange={(e) => setExHeight(Number(e.target.value))}
+                      className="w-full px-3 py-2 rounded-lg border border-amber-200 bg-white"
+                    />
+                  </div>
+                </div>
+                <div className="mt-3 text-xs text-amber-800">
+                  Hover a wall in the 3D room to preview the rectangle, then click to place it.
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+            <h3 className="font-semibold text-slate-900">Current Placements</h3>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              {renderPointEditor(
+                "Sound Source",
+                source,
+                setSource,
+                "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+                "source"
+              )}
+              {renderPointEditor(
+                "Listener",
+                listener,
+                setListener,
+                "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100",
+                "listener"
+              )}
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mb-2 text-sm font-semibold text-slate-900">Exclusions ({exclusions.length})</div>
+
+              {exclusions.length === 0 ? (
+                <div className="text-sm text-slate-400">No exclusions added yet.</div>
+              ) : (
+                <div className="space-y-2">
+                  {exclusions.map((ex, idx) => {
+                    const wallSpan = ex.wall === "north" || ex.wall === "south" ? Number(L) : Number(W);
+                    const widthM = (Number(ex.x2) - Number(ex.x1)) * wallSpan;
+                    const heightM = (Number(ex.z2) - Number(ex.z1)) * Number(H);
+
+                    return (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2"
+                      >
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">
+                            {ex.wall} wall
+                          </div>
+                          <div className="text-xs font-mono text-slate-500">
+                            {fmt(widthM, 2)}m x {fmt(heightM, 2)}m | x {fmt(Number(ex.x1), 2)} to {fmt(Number(ex.x2), 2)} | z {fmt(Number(ex.z1), 2)} to {fmt(Number(ex.z2), 2)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeExclusion(idx)}
+                          className="text-red-600 hover:text-red-700"
+                          title="Delete exclusion"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={onBack}
+              className="flex-1 py-3 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50"
+            >
+              Back
+            </button>
+            <button
+              onClick={onNext}
+              className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-500"
+            >
+              Generate Recommendation
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <PanelView
+            L={Number(L)}
+            W={Number(W)}
+            H={Number(H)}
+            recommendation={null}
+            exclusions={exclusions}
+            source={source}
+            listener={listener}
+            title="Interactive 3D Room Editor"
+            interactive={true}
+            editTool={editTool}
+            exclusionSize={{ width: exWidth, height: exHeight }}
+            onPlaceSource={setSource}
+            onPlaceListener={setListener}
+            onAddExclusion={(rect) => setExclusions((prev) => [...prev, rect])}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Dashboard = ({
   recommendation,
   rt60,
@@ -735,12 +840,8 @@ const Dashboard = ({
   L,
   W,
   H,
-  src_x,
-  src_y,
-  src_z,
-  mic_x,
-  mic_y,
-  mic_z,
+  source,
+  listener,
 }) => {
   if (!recommendation) return null;
 
@@ -749,9 +850,7 @@ const Dashboard = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Analysis Results</h2>
-          <p className="text-slate-500">
-            Optimized plan based on geometry + predicted materials.
-          </p>
+          <p className="text-slate-500">Optimized plan based on geometry + predicted materials.</p>
         </div>
         <div className="flex gap-3">
           <button
@@ -780,27 +879,18 @@ const Dashboard = ({
                   {fmt((recommendation.metrics?.used_coverage ?? 0) * 100, 1)}%
                 </span>
               </div>
-
               <div className="flex justify-between">
                 <span className="text-slate-500">RT60 before</span>
                 <span className="font-semibold text-slate-800">{fmt(rt60?.rt60_before)}s</span>
               </div>
-
               <div className="flex justify-between">
                 <span className="text-slate-500">RT60 after</span>
                 <span className="font-semibold text-green-600">{fmt(rt60?.rt60_after)}s</span>
               </div>
-
               <div className="flex justify-between">
                 <span className="text-slate-500">Δ (before − after)</span>
                 <span className="font-semibold text-slate-800">{fmt(rt60?.rt60_delta)}s</span>
               </div>
-
-              {!rt60 && (
-                <div className="text-xs text-slate-400">
-                  (RT60 will appear after recommendations. If blank, check /predict-rt60 endpoint.)
-                </div>
-              )}
             </div>
           </div>
 
@@ -811,20 +901,16 @@ const Dashboard = ({
 
             <div className="space-y-3 text-sm">
               <div>
-                <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
-                  Source
-                </div>
+                <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">Source</div>
                 <div className="font-mono text-slate-800">
-                  x={fmt(Number(src_x), 2)}, y={fmt(Number(src_y), 2)}, z={fmt(Number(src_z), 2)}
+                  x={fmt(source.x, 2)}, y={fmt(source.y, 2)}, z={fmt(source.z, 2)}
                 </div>
               </div>
 
               <div>
-                <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
-                  Listener
-                </div>
+                <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">Listener</div>
                 <div className="font-mono text-slate-800">
-                  x={fmt(Number(mic_x), 2)}, y={fmt(Number(mic_y), 2)}, z={fmt(Number(mic_z), 2)}
+                  x={fmt(listener.x, 2)}, y={fmt(listener.y, 2)}, z={fmt(listener.z, 2)}
                 </div>
               </div>
             </div>
@@ -846,43 +932,17 @@ const Dashboard = ({
                   disabled={busy.audio}
                   className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {busy.audio ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Play className="w-4 h-4" />
-                  )}
+                  {busy.audio ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
                   Generate Audio Simulation
                 </button>
               </div>
             ) : (
               <div className="space-y-4">
-                <AudioPlayer
-                  type="Clap Test"
-                  label="Before"
-                  src={`http://127.0.0.1:8000${audio.clap_before_audio}`}
-                />
-                <AudioPlayer
-                  type="Clap Test"
-                  label="After"
-                  src={`http://127.0.0.1:8000${audio.clap_after_audio}`}
-                />
+                <AudioPlayer type="Clap Test" label="Before" src={`http://127.0.0.1:8000${audio.clap_before_audio}`} />
+                <AudioPlayer type="Clap Test" label="After" src={`http://127.0.0.1:8000${audio.clap_after_audio}`} />
                 <div className="border-t border-slate-100 my-2" />
-                <AudioPlayer
-                  type="Speech"
-                  label="Before"
-                  src={`http://127.0.0.1:8000${audio.speech_before_audio}`}
-                />
-                <AudioPlayer
-                  type="Speech"
-                  label="After"
-                  src={`http://127.0.0.1:8000${audio.speech_after_audio}`}
-                />
-              </div>
-            )}
-
-            {audio && (
-              <div className="mt-3 text-xs text-slate-400">
-                If playback fails: open the audio URL in a new tab and confirm it downloads/plays.
+                <AudioPlayer type="Speech" label="Before" src={`http://127.0.0.1:8000${audio.speech_before_audio}`} />
+                <AudioPlayer type="Speech" label="After" src={`http://127.0.0.1:8000${audio.speech_after_audio}`} />
               </div>
             )}
           </div>
@@ -899,23 +959,15 @@ const Dashboard = ({
             H={Number(H)}
             recommendation={recommendation}
             exclusions={recommendation?.exclusions || []}
-            source={{
-              x: Number(src_x),
-              y: Number(src_y),
-              z: Number(src_z),
-            }}
-            listener={{
-              x: Number(mic_x),
-              y: Number(mic_y),
-              z: Number(mic_z),
-            }}
+            source={source}
+            listener={listener}
             title="3D Room Viewer"
           />
 
           <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-100 flex gap-3">
             <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-blue-800">
-              <strong>MVP note:</strong> Exclusions are applied as constraints per chosen wall plane. Full 3D reconstruction from a single image is future work.
+              Source, listener, and exclusions were placed in the 3D room editor before optimization.
             </div>
           </div>
         </div>
@@ -928,31 +980,16 @@ const Dashboard = ({
 export default function App() {
   const [step, setStep] = useState(0);
 
-  // Room inputs
   const [L, setL] = useState(5.2);
   const [W, setW] = useState(4.1);
   const [H, setH] = useState(2.8);
 
-  // Source / listener state
-  const [src_x, setSrcX] = useState(1.3);
-  const [src_y, setSrcY] = useState(1.0);
-  const [src_z, setSrcZ] = useState(1.5);
-
-  const [mic_x, setMicX] = useState(2.6);
-  const [mic_y, setMicY] = useState(2.05);
-  const [mic_z, setMicZ] = useState(1.5);
-
   const [imageFile, setImageFile] = useState(null);
   const [imageURL, setImageURL] = useState("");
 
-  // Calibration drawing
-  const [mode, setMode] = useState(null); // wall|floor|ceiling|exclude
+  const [mode, setMode] = useState(null);
   const [samples, setSamples] = useState({ wall: null, floor: null, ceiling: null });
 
-  const [exclusions, setExclusions] = useState([]);
-  const [pendingExcl, setPendingExcl] = useState(null);
-
-  // Materials
   const [override, setOverride] = useState({
     wall: "painted_plaster",
     floor: "wood",
@@ -967,7 +1004,10 @@ export default function App() {
     ceiling: null,
   });
 
-  // Results
+  const [source, setSource] = useState({ x: 1.3, y: 1.0, z: 1.5 });
+  const [listener, setListener] = useState({ x: 2.6, y: 2.05, z: 1.5 });
+  const [exclusions, setExclusions] = useState([]);
+
   const [busy, setBusy] = useState({ suggest: false, rec: false, audio: false });
   const [err, setErr] = useState("");
   const [recommendation, setRecommendation] = useState(null);
@@ -980,20 +1020,20 @@ export default function App() {
 
   const hasDims = Number(L) > 0 && Number(W) > 0 && Number(H) > 0;
   const hasImage = !!imageFile;
-  const canRecommend = hasDims && hasImage && hasSuggested && !pendingExcl;
 
   const onPickImage = (file) => {
     setImageFile(file);
     setImageURL(URL.createObjectURL(file));
 
     setSamples({ wall: null, floor: null, ceiling: null });
-    setExclusions([]);
-    setPendingExcl(null);
-
     setOverride({ wall: "painted_plaster", floor: "wood", ceiling: "painted_plaster" });
     setSuggested({ wall: null, floor: null, ceiling: null });
     setHasSuggested(false);
     setMaterialCandidates({ wall: null, floor: null, ceiling: null });
+
+    setSource({ x: 1.3, y: 1.0, z: 1.5 });
+    setListener({ x: 2.6, y: 2.05, z: 1.5 });
+    setExclusions([]);
 
     setRecommendation(null);
     setRt60(null);
@@ -1001,15 +1041,11 @@ export default function App() {
     setErr("");
   };
 
-  const onClearAll = () => {
+  const onClearMaterialSamples = () => {
     setSamples({ wall: null, floor: null, ceiling: null });
-    setExclusions([]);
-    setPendingExcl(null);
-
     setSuggested({ wall: null, floor: null, ceiling: null });
     setHasSuggested(false);
     setMaterialCandidates({ wall: null, floor: null, ceiling: null });
-
     setErr("");
   };
 
@@ -1073,12 +1109,6 @@ export default function App() {
     setBusy((b) => ({ ...b, rec: true }));
 
     try {
-      if (!canRecommend) {
-        throw new Error(
-          "Missing required steps. Make sure you auto-suggest materials and assign any pending exclusion wall."
-        );
-      }
-
       const payload = {
         L: Number(L),
         W: Number(W),
@@ -1110,7 +1140,7 @@ export default function App() {
         setRt60(null);
       }
 
-      setStep(3);
+      setStep(4);
     } catch (e) {
       setErr(e.message || String(e));
     } finally {
@@ -1135,12 +1165,12 @@ export default function App() {
         floor_a: Number(floor_a),
         ceil_a: Number(ceil_a),
         panels: recommendation.panels,
-        src_x: Number(src_x),
-        src_y: Number(src_y),
-        src_z: Number(src_z),
-        mic_x: Number(mic_x),
-        mic_y: Number(mic_y),
-        mic_z: Number(mic_z),
+        src_x: Number(source.x),
+        src_y: Number(source.y),
+        src_z: Number(source.z),
+        mic_x: Number(listener.x),
+        mic_y: Number(listener.y),
+        mic_z: Number(listener.z),
       };
 
       const res = await api.generateAudio(payload);
@@ -1158,13 +1188,14 @@ export default function App() {
     setImageURL("");
 
     setSamples({ wall: null, floor: null, ceiling: null });
-    setExclusions([]);
-    setPendingExcl(null);
-
     setOverride({ wall: "painted_plaster", floor: "wood", ceiling: "painted_plaster" });
     setSuggested({ wall: null, floor: null, ceiling: null });
     setHasSuggested(false);
     setMaterialCandidates({ wall: null, floor: null, ceiling: null });
+
+    setSource({ x: 1.3, y: 1.0, z: 1.5 });
+    setListener({ x: 2.6, y: 2.05, z: 1.5 });
+    setExclusions([]);
 
     setRecommendation(null);
     setRt60(null);
@@ -1174,14 +1205,6 @@ export default function App() {
     setL(5.2);
     setW(4.1);
     setH(2.8);
-
-    setSrcX(1.3);
-    setSrcY(1.0);
-    setSrcZ(1.5);
-
-    setMicX(2.6);
-    setMicY(2.05);
-    setMicZ(1.5);
   };
 
   return (
@@ -1199,18 +1222,6 @@ export default function App() {
             setW={setW}
             H={H}
             setH={setH}
-            src_x={src_x}
-            setSrcX={setSrcX}
-            src_y={src_y}
-            setSrcY={setSrcY}
-            src_z={src_z}
-            setSrcZ={setSrcZ}
-            mic_x={mic_x}
-            setMicX={setMicX}
-            mic_y={mic_y}
-            setMicY={setMicY}
-            mic_z={mic_z}
-            setMicZ={setMicZ}
             imageFile={imageFile}
             onPickImage={onPickImage}
             onNext={() => setStep(2)}
@@ -1218,16 +1229,12 @@ export default function App() {
         )}
 
         {step === 2 && (
-          <CalibrationStep
+          <MaterialStep
             imageURL={imageURL}
             mode={mode}
             setMode={setMode}
             samples={samples}
             setSamples={setSamples}
-            exclusions={exclusions}
-            setExclusions={setExclusions}
-            pendingExcl={pendingExcl}
-            setPendingExcl={setPendingExcl}
             override={override}
             setOverride={setOverride}
             suggested={suggested}
@@ -1236,13 +1243,28 @@ export default function App() {
             onSuggestMaterials={onSuggestMaterials}
             busy={busy}
             err={err}
-            canRecommend={canRecommend}
-            onAnalyze={onRecommendPanels}
-            onClearAll={onClearAll}
+            onClearAll={onClearMaterialSamples}
+            onNext={() => setStep(3)}
           />
         )}
 
         {step === 3 && (
+          <EditorStep
+            L={L}
+            W={W}
+            H={H}
+            source={source}
+            setSource={setSource}
+            listener={listener}
+            setListener={setListener}
+            exclusions={exclusions}
+            setExclusions={setExclusions}
+            onBack={() => setStep(2)}
+            onNext={onRecommendPanels}
+          />
+        )}
+
+        {step === 4 && (
           <Dashboard
             recommendation={recommendation}
             rt60={rt60}
@@ -1250,12 +1272,8 @@ export default function App() {
             busy={busy}
             onGenerateAudio={onGenerateAudio}
             onReset={handleReset}
-            src_x={src_x}
-            src_y={src_y}
-            src_z={src_z}
-            mic_x={mic_x}
-            mic_y={mic_y}
-            mic_z={mic_z}
+            source={source}
+            listener={listener}
             L={L}
             W={W}
             H={H}
@@ -1272,5 +1290,3 @@ export default function App() {
     </div>
   );
 }
-
-
