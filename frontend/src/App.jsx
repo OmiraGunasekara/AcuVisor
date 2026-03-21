@@ -1,4 +1,5 @@
-import React, { useState, useRef, useMemo, useEffect } from "react";
+import React, { useState, useRef, useMemo } from "react";
+import { api } from "./api";
 import {
   Upload,
   Maximize,
@@ -16,60 +17,18 @@ import {
   Eraser,
   Wand2,
   RefreshCw,
+  Radio,
+  Mic2,
 } from "lucide-react";
 
 import PanelView from "./components/PanelView";
 
-// --- API HANDLING ---
-const BASE = "http://127.0.0.1:8000";
-
-const api = {
-  suggestMaterial: async (fd) => {
-    const res = await fetch(`${BASE}/suggest-material`, {
-      method: "POST",
-      body: fd,
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return await res.json();
-  },
-
-  recommendPanels: async (payload) => {
-    const res = await fetch(`${BASE}/recommend-panels`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return await res.json();
-  },
-
-  predictRt60: async (payload) => {
-    const res = await fetch(`${BASE}/predict-rt60`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return await res.json();
-  },
-
-  generateAudio: async (payload) => {
-    const res = await fetch(`${BASE}/generate-audio`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return await res.json();
-  },
-};
-
 // --- CONSTANTS ---
 const MATERIALS = {
   painted_plaster: { label: "Painted plaster", a: 0.07 },
-  gypsum: { label: "Gypsum board", a: 0.10 },
+  gypsum: { label: "Gypsum board", a: 0.1 },
   concrete: { label: "Concrete", a: 0.03 },
-  wood: { label: "Wood", a: 0.20 },
+  wood: { label: "Wood", a: 0.2 },
   carpet: { label: "Carpet", a: 0.45 },
   tile: { label: "Tile", a: 0.05 },
   brick: { label: "Brick", a: 0.04 },
@@ -141,7 +100,29 @@ const Hero = ({ onStart }) => (
 );
 
 // --- STEP 1: INPUTS ---
-const InputStep = ({ L, setL, W, setW, H, setH, onPickImage, imageFile, onNext }) => {
+const InputStep = ({
+  L,
+  setL,
+  W,
+  setW,
+  H,
+  setH,
+  src_x,
+  setSrcX,
+  src_y,
+  setSrcY,
+  src_z,
+  setSrcZ,
+  mic_x,
+  setMicX,
+  mic_y,
+  setMicY,
+  mic_z,
+  setMicZ,
+  onPickImage,
+  imageFile,
+  onNext,
+}) => {
   const handleDrop = (e) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
@@ -158,17 +139,19 @@ const InputStep = ({ L, setL, W, setW, H, setH, onPickImage, imageFile, onNext }
   const isFormValid = L && W && H && imageFile;
 
   return (
-    <div className="max-w-3xl mx-auto py-12 px-4 animate-slide-up">
+    <div className="max-w-4xl mx-auto py-12 px-4 animate-slide-up">
       <div className="space-y-2 mb-8">
         <h2 className="text-3xl font-bold text-slate-900">Room Configuration</h2>
-        <p className="text-slate-500">Enter dimensions and upload a photo to begin.</p>
+        <p className="text-slate-500">
+          Enter dimensions, optional source/listener positions, and upload a room photo.
+        </p>
       </div>
 
       <div className="grid gap-8">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold">
             <Maximize className="w-5 h-5 text-blue-600" />
-            <h3>Dimensions (Meters)</h3>
+            <h3>Room Dimensions (Meters)</h3>
           </div>
           <div className="grid grid-cols-3 gap-4">
             {[
@@ -177,7 +160,67 @@ const InputStep = ({ L, setL, W, setW, H, setH, onPickImage, imageFile, onNext }
               { label: "Height", val: H, set: setH },
             ].map((field) => (
               <div key={field.label} className="space-y-1">
-                <label className="text-xs font-medium text-slate-500 uppercase">{field.label}</label>
+                <label className="text-xs font-medium text-slate-500 uppercase">
+                  {field.label}
+                </label>
+                <input
+                  type="number"
+                  value={field.val}
+                  onChange={(e) => field.set(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold">
+            <Radio className="w-5 h-5 text-blue-600" />
+            <h3>Audio Source Position (Optional)</h3>
+          </div>
+          <p className="text-sm text-slate-500 mb-4">
+            These are used for before/after audio generation. Leave as default if unsure.
+          </p>
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { label: "Source X", val: src_x, set: setSrcX },
+              { label: "Source Y", val: src_y, set: setSrcY },
+              { label: "Source Z", val: src_z, set: setSrcZ },
+            ].map((field) => (
+              <div key={field.label} className="space-y-1">
+                <label className="text-xs font-medium text-slate-500 uppercase">
+                  {field.label}
+                </label>
+                <input
+                  type="number"
+                  value={field.val}
+                  onChange={(e) => field.set(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold">
+            <Mic2 className="w-5 h-5 text-blue-600" />
+            <h3>Listener / Microphone Position (Optional)</h3>
+          </div>
+          <p className="text-sm text-slate-500 mb-4">
+            These are used for before/after audio generation. Leave as default if unsure.
+          </p>
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { label: "Listener X", val: mic_x, set: setMicX },
+              { label: "Listener Y", val: mic_y, set: setMicY },
+              { label: "Listener Z", val: mic_z, set: setMicZ },
+            ].map((field) => (
+              <div key={field.label} className="space-y-1">
+                <label className="text-xs font-medium text-slate-500 uppercase">
+                  {field.label}
+                </label>
                 <input
                   type="number"
                   value={field.val}
@@ -215,7 +258,9 @@ const InputStep = ({ L, setL, W, setW, H, setH, onPickImage, imageFile, onNext }
                 <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-3">
                   <Upload className="w-6 h-6" />
                 </div>
-                <p className="text-slate-900 font-medium">Click to upload or drag and drop</p>
+                <p className="text-slate-900 font-medium">
+                  Click to upload or drag and drop
+                </p>
                 <p className="text-sm text-slate-500 mt-1">Supports JPG, PNG</p>
               </>
             )}
@@ -226,7 +271,9 @@ const InputStep = ({ L, setL, W, setW, H, setH, onPickImage, imageFile, onNext }
           disabled={!isFormValid}
           onClick={onNext}
           className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-            isFormValid ? "bg-blue-600 text-white shadow-lg hover:bg-blue-500" : "bg-slate-200 text-slate-400 cursor-not-allowed"
+            isFormValid
+              ? "bg-blue-600 text-white shadow-lg hover:bg-blue-500"
+              : "bg-slate-200 text-slate-400 cursor-not-allowed"
           }`}
         >
           Next: Calibration
@@ -269,13 +316,17 @@ const AudioPlayer = ({ type, label, src }) => {
         <button
           onClick={toggle}
           className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-            playing ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            playing
+              ? "bg-indigo-600 text-white"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
           }`}
         >
           {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-1" />}
         </button>
         <div>
-          <div className="text-xs text-slate-500 uppercase font-bold tracking-wider">{type}</div>
+          <div className="text-xs text-slate-500 uppercase font-bold tracking-wider">
+            {type}
+          </div>
           <div className="text-sm font-semibold text-slate-900">{label}</div>
         </div>
       </div>
@@ -301,14 +352,12 @@ const CalibrationStep = ({
   setExclusions,
   pendingExcl,
   setPendingExcl,
-
   override,
   setOverride,
   suggested,
   hasSuggested,
   materialCandidates,
   onSuggestMaterials,
-
   busy,
   err,
   canRecommend,
@@ -406,7 +455,6 @@ const CalibrationStep = ({
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 animate-slide-up h-[calc(100vh-100px)]">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
-        {/* Left: Tools */}
         <div className="lg:col-span-1 flex flex-col gap-6 overflow-y-auto pr-2">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">Calibration</h2>
@@ -421,7 +469,6 @@ const CalibrationStep = ({
             </div>
           )}
 
-          {/* Tools */}
           <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide flex items-center gap-2">
               <PenTool className="w-4 h-4" /> Sampling Tools
@@ -457,7 +504,6 @@ const CalibrationStep = ({
             </div>
           </div>
 
-          {/* Pending exclusion wall choice */}
           {pendingExcl && (
             <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
               <div className="text-sm font-semibold text-slate-800 mb-2">
@@ -501,7 +547,6 @@ const CalibrationStep = ({
             </div>
           )}
 
-          {/* Materials */}
           <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex-1">
             <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide flex items-center gap-2">
               <Layers className="w-4 h-4" /> Material Properties
@@ -532,7 +577,9 @@ const CalibrationStep = ({
               </div>
             ) : (
               <>
-                <div className="text-xs text-slate-500">Suggested by AI. Override if incorrect.</div>
+                <div className="text-xs text-slate-500">
+                  Suggested by AI. Override if incorrect.
+                </div>
 
                 <div className="space-y-3 pt-2">
                   {["wall", "floor", "ceiling"].map((surf) => {
@@ -554,7 +601,9 @@ const CalibrationStep = ({
                               <span className="font-semibold text-slate-700">
                                 {MATERIALS[sug]?.label ?? sug}
                               </span>{" "}
-                              <span className="text-slate-400">(a={MATERIALS[sug]?.a})</span>
+                              <span className="text-slate-400">
+                                (a={MATERIALS[sug]?.a})
+                              </span>
                             </div>
 
                             {changed && (
@@ -567,13 +616,17 @@ const CalibrationStep = ({
 
                         <select
                           value={user}
-                          onChange={(e) => setOverride((prev) => ({ ...prev, [surf]: e.target.value }))}
+                          onChange={(e) =>
+                            setOverride((prev) => ({ ...prev, [surf]: e.target.value }))
+                          }
                           className="w-full text-sm p-2 rounded border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
                         >
                           {candidates && candidates.length > 0
                             ? candidates.map((cand) => (
                                 <option key={cand.label} value={cand.label}>
-                                  {(cand.display_name || MATERIALS[cand.label]?.label || cand.label) +
+                                  {(cand.display_name ||
+                                    MATERIALS[cand.label]?.label ||
+                                    cand.label) +
                                     ` (a=${cand.alpha ?? MATERIALS[cand.label]?.a ?? "?"})` +
                                     (cand.label === sug ? " ⭐" : "")}
                                 </option>
@@ -592,7 +645,6 @@ const CalibrationStep = ({
             )}
           </div>
 
-          {/* Analyze */}
           <button
             onClick={onAnalyze}
             disabled={busy.rec || !canRecommend}
@@ -613,7 +665,6 @@ const CalibrationStep = ({
           )}
         </div>
 
-        {/* Right: Image Canvas */}
         <div className="lg:col-span-2 bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden relative shadow-2xl flex items-center justify-center">
           <div className="relative w-full h-full flex items-center justify-center p-4">
             {imageURL ? (
@@ -629,13 +680,14 @@ const CalibrationStep = ({
                   onMouseDown={onMouseDown}
                   onMouseMove={onMouseMove}
                   onMouseUp={onMouseUp}
-                  className={`absolute inset-0 z-10 rounded-lg ${mode ? "cursor-crosshair" : "cursor-default"}`}
+                  className={`absolute inset-0 z-10 rounded-lg ${
+                    mode ? "cursor-crosshair" : "cursor-default"
+                  }`}
                 >
                   <RectOverlay rect={samples.wall} color="#2563eb" label="WALL" />
                   <RectOverlay rect={samples.floor} color="#16a34a" label="FLOOR" />
                   <RectOverlay rect={samples.ceiling} color="#eab308" label="CEILING" />
 
-                  {/* exclusions stored as {wall,x1,x2,z1,z2} -> map back to overlay {x1,y1,x2,y2} */}
                   {exclusions.map((r, i) => (
                     <RectOverlay
                       key={i}
@@ -645,12 +697,10 @@ const CalibrationStep = ({
                     />
                   ))}
 
-                  {/* pending exclusion overlay */}
                   {pendingExcl && (
                     <RectOverlay rect={pendingExcl} color="#ffffff" label="EXCL (choose wall)" />
                   )}
 
-                  {/* dragging preview */}
                   {drag &&
                     (() => {
                       const r = finalizeRect(drag);
@@ -675,7 +725,23 @@ const CalibrationStep = ({
 };
 
 // --- STEP 3: DASHBOARD ---
-const Dashboard = ({ recommendation, rt60, audio, busy, onGenerateAudio, onReset }) => {
+const Dashboard = ({
+  recommendation,
+  rt60,
+  audio,
+  busy,
+  onGenerateAudio,
+  onReset,
+  L,
+  W,
+  H,
+  src_x,
+  src_y,
+  src_z,
+  mic_x,
+  mic_y,
+  mic_z,
+}) => {
   if (!recommendation) return null;
 
   return (
@@ -683,7 +749,9 @@ const Dashboard = ({ recommendation, rt60, audio, busy, onGenerateAudio, onReset
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Analysis Results</h2>
-          <p className="text-slate-500">Optimized plan based on geometry + predicted materials.</p>
+          <p className="text-slate-500">
+            Optimized plan based on geometry + predicted materials.
+          </p>
         </div>
         <div className="flex gap-3">
           <button
@@ -699,9 +767,7 @@ const Dashboard = ({ recommendation, rt60, audio, busy, onGenerateAudio, onReset
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Column 1: Metrics & Audio */}
         <div className="space-y-6">
-          {/* Key Metrics */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-blue-600" /> Acoustic Metrics (Predicted)
@@ -710,7 +776,9 @@ const Dashboard = ({ recommendation, rt60, audio, busy, onGenerateAudio, onReset
             <div className="space-y-4 text-sm">
               <div className="flex justify-between">
                 <span className="text-slate-500">Panel coverage used</span>
-                <span className="font-semibold text-slate-800">{fmt(recommendation.used_coverage * 100, 1)}%</span>
+                <span className="font-semibold text-slate-800">
+                  {fmt((recommendation.metrics?.used_coverage ?? 0) * 100, 1)}%
+                </span>
               </div>
 
               <div className="flex justify-between">
@@ -736,7 +804,32 @@ const Dashboard = ({ recommendation, rt60, audio, busy, onGenerateAudio, onReset
             </div>
           </div>
 
-          {/* Audio */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <Mic2 className="w-5 h-5 text-blue-600" /> Audio Positions
+            </h3>
+
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
+                  Source
+                </div>
+                <div className="font-mono text-slate-800">
+                  x={fmt(Number(src_x), 2)}, y={fmt(Number(src_y), 2)}, z={fmt(Number(src_z), 2)}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
+                  Listener
+                </div>
+                <div className="font-mono text-slate-800">
+                  x={fmt(Number(mic_x), 2)}, y={fmt(Number(mic_y), 2)}, z={fmt(Number(mic_z), 2)}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <Volume2 className="w-5 h-5 text-purple-600" />
@@ -753,17 +846,37 @@ const Dashboard = ({ recommendation, rt60, audio, busy, onGenerateAudio, onReset
                   disabled={busy.audio}
                   className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {busy.audio ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                  {busy.audio ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Play className="w-4 h-4" />
+                  )}
                   Generate Audio Simulation
                 </button>
               </div>
             ) : (
               <div className="space-y-4">
-                <AudioPlayer type="Clap Test" label="Before" src={`${BASE}${audio.clap_before_audio}`} />
-                <AudioPlayer type="Clap Test" label="After" src={`${BASE}${audio.clap_after_audio}`} />
+                <AudioPlayer
+                  type="Clap Test"
+                  label="Before"
+                  src={`http://127.0.0.1:8000${audio.clap_before_audio}`}
+                />
+                <AudioPlayer
+                  type="Clap Test"
+                  label="After"
+                  src={`http://127.0.0.1:8000${audio.clap_after_audio}`}
+                />
                 <div className="border-t border-slate-100 my-2" />
-                <AudioPlayer type="Speech" label="Before" src={`${BASE}${audio.speech_before_audio}`} />
-                <AudioPlayer type="Speech" label="After" src={`${BASE}${audio.speech_after_audio}`} />
+                <AudioPlayer
+                  type="Speech"
+                  label="Before"
+                  src={`http://127.0.0.1:8000${audio.speech_before_audio}`}
+                />
+                <AudioPlayer
+                  type="Speech"
+                  label="After"
+                  src={`http://127.0.0.1:8000${audio.speech_after_audio}`}
+                />
               </div>
             )}
 
@@ -775,14 +888,29 @@ const Dashboard = ({ recommendation, rt60, audio, busy, onGenerateAudio, onReset
           </div>
         </div>
 
-        {/* Column 2: Panel Layout */}
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
           <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
             <Box className="w-5 h-5 text-blue-600" /> Recommended Treatment Plan
           </h3>
 
-          {/* ✅ your pseudo-3D wall grid */}
-          <PanelView panels={recommendation.panels || []} title="Panel Layout (by wall)" />
+          <PanelView
+            L={Number(L)}
+            W={Number(W)}
+            H={Number(H)}
+            recommendation={recommendation}
+            exclusions={recommendation?.exclusions || []}
+            source={{
+              x: Number(src_x),
+              y: Number(src_y),
+              z: Number(src_z),
+            }}
+            listener={{
+              x: Number(mic_x),
+              y: Number(mic_y),
+              z: Number(mic_z),
+            }}
+            title="3D Room Viewer"
+          />
 
           <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-100 flex gap-3">
             <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
@@ -805,6 +933,15 @@ export default function App() {
   const [W, setW] = useState(4.1);
   const [H, setH] = useState(2.8);
 
+  // Source / listener state
+  const [src_x, setSrcX] = useState(1.3);
+  const [src_y, setSrcY] = useState(1.0);
+  const [src_z, setSrcZ] = useState(1.5);
+
+  const [mic_x, setMicX] = useState(2.6);
+  const [mic_y, setMicY] = useState(2.05);
+  const [mic_z, setMicZ] = useState(1.5);
+
   const [imageFile, setImageFile] = useState(null);
   const [imageURL, setImageURL] = useState("");
 
@@ -824,7 +961,11 @@ export default function App() {
 
   const [suggested, setSuggested] = useState({ wall: null, floor: null, ceiling: null });
   const [hasSuggested, setHasSuggested] = useState(false);
-  const [materialCandidates, setMaterialCandidates] = useState({ wall: null, floor: null, ceiling: null });
+  const [materialCandidates, setMaterialCandidates] = useState({
+    wall: null,
+    floor: null,
+    ceiling: null,
+  });
 
   // Results
   const [busy, setBusy] = useState({ suggest: false, rec: false, audio: false });
@@ -833,9 +974,8 @@ export default function App() {
   const [rt60, setRt60] = useState(null);
   const [audio, setAudio] = useState(null);
 
-  // Derived absorption
   const wall_a = useMemo(() => MATERIALS[override.wall]?.a || 0.07, [override.wall]);
-  const floor_a = useMemo(() => MATERIALS[override.floor]?.a || 0.20, [override.floor]);
+  const floor_a = useMemo(() => MATERIALS[override.floor]?.a || 0.2, [override.floor]);
   const ceil_a = useMemo(() => MATERIALS[override.ceiling]?.a || 0.07, [override.ceiling]);
 
   const hasDims = Number(L) > 0 && Number(W) > 0 && Number(H) > 0;
@@ -846,7 +986,6 @@ export default function App() {
     setImageFile(file);
     setImageURL(URL.createObjectURL(file));
 
-    // reset downstream
     setSamples({ wall: null, floor: null, ceiling: null });
     setExclusions([]);
     setPendingExcl(null);
@@ -900,7 +1039,8 @@ export default function App() {
       const floorRes = await callSuggestOne("floor");
       const ceilRes = await callSuggestOne("ceiling");
 
-      const extractLabel = (res) => res?.suggested_label ?? res?.predicted_label ?? res?.label ?? null;
+      const extractLabel = (res) =>
+        res?.suggested_label ?? res?.predicted_label ?? res?.label ?? null;
 
       const mapLabel = (res, fallback) => {
         const raw = extractLabel(res);
@@ -919,9 +1059,7 @@ export default function App() {
       });
 
       setOverride({ wall: wallLabel, floor: floorLabel, ceiling: ceilLabel });
-
       setSuggested({ wall: wallLabel, floor: floorLabel, ceiling: ceilLabel });
-
       setHasSuggested(true);
     } catch (e) {
       setErr(e.message || String(e));
@@ -936,7 +1074,9 @@ export default function App() {
 
     try {
       if (!canRecommend) {
-        throw new Error("Missing required steps. Make sure you auto-suggest materials and assign any pending exclusion wall.");
+        throw new Error(
+          "Missing required steps. Make sure you auto-suggest materials and assign any pending exclusion wall."
+        );
       }
 
       const payload = {
@@ -961,7 +1101,7 @@ export default function App() {
           wall_a: Number(wall_a),
           floor_a: Number(floor_a),
           ceil_a: Number(ceil_a),
-          panel_coverage: Number(res.used_coverage ?? 0.5),
+          panel_coverage: Number(res.metrics?.used_coverage ?? 0.5),
         };
         const rtRes = await api.predictRt60(rtReq);
         setRt60(rtRes);
@@ -995,6 +1135,12 @@ export default function App() {
         floor_a: Number(floor_a),
         ceil_a: Number(ceil_a),
         panels: recommendation.panels,
+        src_x: Number(src_x),
+        src_y: Number(src_y),
+        src_z: Number(src_z),
+        mic_x: Number(mic_x),
+        mic_y: Number(mic_y),
+        mic_z: Number(mic_z),
       };
 
       const res = await api.generateAudio(payload);
@@ -1024,6 +1170,18 @@ export default function App() {
     setRt60(null);
     setAudio(null);
     setErr("");
+
+    setL(5.2);
+    setW(4.1);
+    setH(2.8);
+
+    setSrcX(1.3);
+    setSrcY(1.0);
+    setSrcZ(1.5);
+
+    setMicX(2.6);
+    setMicY(2.05);
+    setMicZ(1.5);
   };
 
   return (
@@ -1041,6 +1199,18 @@ export default function App() {
             setW={setW}
             H={H}
             setH={setH}
+            src_x={src_x}
+            setSrcX={setSrcX}
+            src_y={src_y}
+            setSrcY={setSrcY}
+            src_z={src_z}
+            setSrcZ={setSrcZ}
+            mic_x={mic_x}
+            setMicX={setMicX}
+            mic_y={mic_y}
+            setMicY={setMicY}
+            mic_z={mic_z}
+            setMicZ={setMicZ}
             imageFile={imageFile}
             onPickImage={onPickImage}
             onNext={() => setStep(2)}
@@ -1080,6 +1250,15 @@ export default function App() {
             busy={busy}
             onGenerateAudio={onGenerateAudio}
             onReset={handleReset}
+            src_x={src_x}
+            src_y={src_y}
+            src_z={src_z}
+            mic_x={mic_x}
+            mic_y={mic_y}
+            mic_z={mic_z}
+            L={L}
+            W={W}
+            H={H}
           />
         )}
       </main>

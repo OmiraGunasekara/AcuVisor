@@ -26,6 +26,12 @@ class RecommendRequest(BaseModel):
     exclusions: List[ExclusionRect] = Field(default_factory=list)
 
 
+class RoomInfo(BaseModel):
+    L: float
+    W: float
+    H: float
+
+
 class PanelRect(BaseModel):
     wall: str
 
@@ -46,13 +52,36 @@ class PanelRect(BaseModel):
     panel_label: str
 
 
-class RecommendResponse(BaseModel):
+class ExclusionRectResponse(BaseModel):
+    wall: str
+
+    x1: float
+    x2: float
+    z1: float
+    z2: float
+
+    x1_m: float
+    x2_m: float
+    z1_m: float
+    z2_m: float
+    width_m: float
+    height_m: float
+
+
+class RecommendMetrics(BaseModel):
     used_coverage: float
-    panels: List[PanelRect]
     rt60_before: float
     rt60_after: float
     rt60_delta: float
     total_panel_area_m2: float
+    total_panel_count: int
+
+
+class RecommendResponse(BaseModel):
+    room: RoomInfo
+    panels: List[PanelRect]
+    exclusions: List[ExclusionRectResponse]
+    metrics: RecommendMetrics
 
 
 def _panel_label(width_m: float, height_m: float) -> str:
@@ -61,14 +90,13 @@ def _panel_label(width_m: float, height_m: float) -> str:
     return f"{w_mm}x{h_mm}mm"
 
 
+def _wall_width(wall: str, L: float, W: float) -> float:
+    return L if wall in ["north", "south"] else W
+
+
 def _add_physical_dimensions(panel: dict, L: float, W: float, H: float) -> PanelRect:
     wall = panel["wall"]
-
-    if wall in ["north", "south"]:
-        wall_width = L
-    else:
-        wall_width = W
-
+    wall_width = _wall_width(wall, L, W)
     wall_height = H
 
     x1_m = panel["x1"] * wall_width
@@ -100,6 +128,31 @@ def _add_physical_dimensions(panel: dict, L: float, W: float, H: float) -> Panel
     )
 
 
+def _add_exclusion_dimensions(ex: dict, L: float, W: float, H: float) -> ExclusionRectResponse:
+    wall = ex["wall"]
+    wall_width = _wall_width(wall, L, W)
+    wall_height = H
+
+    x1_m = ex["x1"] * wall_width
+    x2_m = ex["x2"] * wall_width
+    z1_m = ex["z1"] * wall_height
+    z2_m = ex["z2"] * wall_height
+
+    return ExclusionRectResponse(
+        wall=wall,
+        x1=ex["x1"],
+        x2=ex["x2"],
+        z1=ex["z1"],
+        z2=ex["z2"],
+        x1_m=round(x1_m, 3),
+        x2_m=round(x2_m, 3),
+        z1_m=round(z1_m, 3),
+        z2_m=round(z2_m, 3),
+        width_m=round(x2_m - x1_m, 3),
+        height_m=round(z2_m - z1_m, 3),
+    )
+
+
 @router.post("", response_model=RecommendResponse)
 async def recommend_panels(req: RecommendRequest):
     try:
@@ -116,7 +169,7 @@ async def recommend_panels(req: RecommendRequest):
             max_coverage=req.target_coverage,
             population=40,
             generations=30,
-            seed=None,#Change to None for deterministic results
+            seed=None,  # deterministic per-input inside run_ga()
         )
 
         panels_with_dims = [
@@ -124,15 +177,29 @@ async def recommend_panels(req: RecommendRequest):
             for p in result["panels"]
         ]
 
+        exclusions_with_dims = [
+            _add_exclusion_dimensions(ex, req.L, req.W, req.H)
+            for ex in exclusions
+        ]
+
         total_area_m2 = sum(p.width_m * p.height_m for p in panels_with_dims)
 
         return RecommendResponse(
-            used_coverage=result["used_coverage"],
+            room=RoomInfo(
+                L=req.L,
+                W=req.W,
+                H=req.H,
+            ),
             panels=panels_with_dims,
-            rt60_before=result["rt60_before"],
-            rt60_after=result["rt60_after"],
-            rt60_delta=result["rt60_delta"],
-            total_panel_area_m2=round(total_area_m2, 2),
+            exclusions=exclusions_with_dims,
+            metrics=RecommendMetrics(
+                used_coverage=round(result["used_coverage"], 6),
+                rt60_before=round(result["rt60_before"], 6),
+                rt60_after=round(result["rt60_after"], 6),
+                rt60_delta=round(result["rt60_delta"], 6),
+                total_panel_area_m2=round(total_area_m2, 2),
+                total_panel_count=len(panels_with_dims),
+            ),
         )
 
     except Exception as e:
