@@ -72,7 +72,7 @@ const Header = () => (
 );
 
 const Hero = ({ onStart }) => (
-  <div className="min-h-[calc(95vh-1.1rem)] flex flex-col items-center justify-center text-center px-4 bg-gradient-to-b from-slate-900 to-slate-950 text-white animate-fade-in">
+  <div className="min-h-[calc(100dvh-4rem-1px)] flex flex-col items-center justify-center px-4 py-10 text-center bg-gradient-to-b from-slate-900 to-slate-950 text-white animate-fade-in">
     <div className="w-full max-w-4xl space-y-8">
       <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-900/30 border border-blue-800 text-blue-400 text-xs font-medium uppercase tracking-wider">
         AI-Powered Acoustic Engineering
@@ -453,9 +453,9 @@ const CalibrationStep = ({
   const canSuggest = samples.wall && samples.floor && samples.ceiling;
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 animate-slide-up h-[calc(100vh-100px)]">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
-        <div className="lg:col-span-1 flex flex-col gap-6 overflow-y-auto pr-2">
+    <div className="max-w-6xl mx-auto px-4 py-6 lg:py-8 animate-slide-up min-h-[calc(100dvh-4rem-1px)] lg:h-[calc(100dvh-4rem-1px)]">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:h-full">
+        <div className="flex flex-col gap-6 lg:col-span-1 lg:min-h-0 lg:overflow-y-auto lg:pr-2">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">Calibration</h2>
             <p className="text-slate-500 text-sm">
@@ -1272,3 +1272,5 @@ export default function App() {
     </div>
   );
 }
+
+

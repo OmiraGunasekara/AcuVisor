@@ -255,7 +255,7 @@ export default function PanelView({
       </div>
 
       <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden">
-        <div className="h-[440px] md:h-[560px]">
+        <div className="h-[clamp(18rem,46vh,34rem)]">
           <Canvas
             shadows={false}
             camera={{
@@ -299,4 +299,5 @@ export default function PanelView({
     </div>
   );
 }
+
 
