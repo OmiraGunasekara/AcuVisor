@@ -11,7 +11,35 @@ SAMPLES_DIR = "app/static/samples"
 FS = 16000
 
 
-def build_room(L, W, H, wall_a, floor_a, ceil_a, max_order=30):
+def clamp_position(x, y, z, L, W, H, margin=0.05):
+    x = float(np.clip(float(x), margin, float(L) - margin))
+    y = float(np.clip(float(y), margin, float(W) - margin))
+    z = float(np.clip(float(z), margin, float(H) - margin))
+    return x, y, z
+
+
+def resolve_positions(L, W, H, src_x=None, src_y=None, src_z=None, mic_x=None, mic_y=None, mic_z=None):
+    default_src = (float(L) / 4.0, float(W) / 4.0, min(1.5, float(H) - 0.05))
+    default_mic = (float(L) / 2.0, float(W) / 2.0, min(1.5, float(H) - 0.05))
+
+    src = (
+        default_src[0] if src_x is None else src_x,
+        default_src[1] if src_y is None else src_y,
+        default_src[2] if src_z is None else src_z,
+    )
+    mic = (
+        default_mic[0] if mic_x is None else mic_x,
+        default_mic[1] if mic_y is None else mic_y,
+        default_mic[2] if mic_z is None else mic_z,
+    )
+
+    src = clamp_position(*src, L, W, H)
+    mic = clamp_position(*mic, L, W, H)
+
+    return src, mic
+
+
+def build_room(L, W, H, wall_a, floor_a, ceil_a, src_pos, mic_pos, max_order=30):
     materials = pra.make_materials(
         ceiling=float(ceil_a),
         floor=float(floor_a),
@@ -29,8 +57,8 @@ def build_room(L, W, H, wall_a, floor_a, ceil_a, max_order=30):
         air_absorption=True,
     )
 
-    mic = np.array([[L / 2], [W / 2], [1.5]])
-    src = np.array([[L / 4], [W / 4], [1.5]])
+    mic = np.array([[mic_pos[0]], [mic_pos[1]], [mic_pos[2]]], dtype=np.float32)
+    src = np.array([src_pos[0], src_pos[1], src_pos[2]], dtype=np.float32)
 
     room.add_microphone_array(mic)
     room.add_source(src)
@@ -46,7 +74,6 @@ def panel_coverage_from_rects(panels):
 
 
 def boosted_wall_absorption(wall_a, panels, boost_strength=0.5):
-
     cov = panel_coverage_from_rects(panels)
     return float(np.clip(float(wall_a) + cov * float(boost_strength), 0.0, 0.95))
 
@@ -60,7 +87,6 @@ def compute_rir(room):
 def estimate_rt60_t30(rir):
     rir = np.asarray(rir, dtype=np.float64)
 
-    # Energy decay curve (Schroeder integration)
     edc = np.cumsum(rir[::-1] ** 2)[::-1]
     edc = edc / (edc[0] + 1e-12)
     edc_db = 10.0 * np.log10(edc + 1e-12)
@@ -71,16 +97,14 @@ def estimate_rt60_t30(rir):
             return None
         t = idx / FS
         y = edc_db[idx]
-        # Linear regression y = a*t + b
         a, b = np.polyfit(t, y, 1)
         if a >= 0:
             return None
-        # RT60 is time to decay 60 dB
         return float(-60.0 / a)
 
-    rt = fit_rt60(-5.0, -35.0)  # T30 range
+    rt = fit_rt60(-5.0, -35.0)
     if rt is None:
-        rt = fit_rt60(-5.0, -25.0)  # T20 fallback
+        rt = fit_rt60(-5.0, -25.0)
     return rt if rt is not None else float("nan")
 
 
@@ -89,33 +113,29 @@ def save_wav(path, audio):
 
 
 def load_and_resample_dry_wav():
-
     os.makedirs(SAMPLES_DIR, exist_ok=True)
     sample_path = os.path.join(SAMPLES_DIR, "dry_speech.wav")
 
     if not os.path.exists(sample_path):
-        # fallback: 2s click (not ideal, but prevents crash)
         x = np.zeros(FS * 2, dtype=np.float32)
         x[0] = 1.0
         return x
 
     x, fs_in = sf.read(sample_path)
     x = np.asarray(x, dtype=np.float32)
-    if x.ndim > 1:
-        x = x.mean(axis=1)  # mono
 
-    # light normalize dry
+    if x.ndim > 1:
+        x = x.mean(axis=1)
+
     peak = np.max(np.abs(x)) + 1e-6
     x = x / peak * 0.8
 
-    # Proper resample to FS
     if fs_in != FS:
         g = np.gcd(int(fs_in), int(FS))
         up = FS // g
         down = int(fs_in) // g
         x = resample_poly(x, up, down).astype(np.float32)
 
-    # keep ~4 seconds (good for hearing decay)
     max_len = FS * 4
     if len(x) > max_len:
         x = x[:max_len]
@@ -140,80 +160,95 @@ def mix_wet_dry(dry, wet, wet_ratio=0.35):
 
 
 def make_clap(fs=FS, length_sec=1.5):
-
     n = int(fs * length_sec)
     x = np.zeros(n, dtype=np.float32)
 
-    # impulse at start
     x[0] = 1.0
 
-    # 10ms noise burst
     burst_len = int(0.01 * fs)
     x[:burst_len] += 0.6 * np.random.randn(burst_len).astype(np.float32)
 
-    # decay envelope
     env = np.exp(-np.linspace(0, 6, n)).astype(np.float32)
     x *= env
 
-    # normalize
     peak = np.max(np.abs(x)) + 1e-6
     x = x / peak * 0.9
     return x
 
 
-def generate_audio(L, W, H, wall_a, floor_a, ceil_a, panels):
-
-    # Create a unique folder per run: YYYYMMDD_HHMMSS_xxxxxx
+def generate_audio(
+    L,
+    W,
+    H,
+    wall_a,
+    floor_a,
+    ceil_a,
+    panels,
+    src_x=None,
+    src_y=None,
+    src_z=None,
+    mic_x=None,
+    mic_y=None,
+    mic_z=None,
+):
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     short = uuid.uuid4().hex[:6]
     run_folder = f"{ts}_{short}"
     run_dir = os.path.join(AUDIO_DIR, run_folder)
     os.makedirs(run_dir, exist_ok=True)
 
-    # DRY speech
     dry = load_and_resample_dry_wav()
 
-    # BEFORE room
-    room_before = build_room(L, W, H, wall_a, floor_a, ceil_a, max_order=35)
+    src_pos, mic_pos = resolve_positions(
+        L, W, H,
+        src_x=src_x, src_y=src_y, src_z=src_z,
+        mic_x=mic_x, mic_y=mic_y, mic_z=mic_z,
+    )
+
+    room_before = build_room(
+        L, W, H, wall_a, floor_a, ceil_a,
+        src_pos=src_pos,
+        mic_pos=mic_pos,
+        max_order=35,
+    )
     rir_before = compute_rir(room_before)
-    # rt60_before = estimate_rt60_schroeder(rir_before)
     rt60_before = estimate_rt60_t30(rir_before)
 
-    # AFTER room (boost wall absorption from panel layout)
     wall_a_after = boosted_wall_absorption(wall_a, panels, boost_strength=0.5)
-    room_after = build_room(L, W, H, wall_a_after, floor_a, ceil_a, max_order=30)
+    room_after = build_room(
+        L, W, H, wall_a_after, floor_a, ceil_a,
+        src_pos=src_pos,
+        mic_pos=mic_pos,
+        max_order=30,
+    )
     rir_after = compute_rir(room_after)
-    # rt60_after = estimate_rt60_schroeder(rir_after)
-    rt60_after  = estimate_rt60_t30(rir_after)
+    rt60_after = estimate_rt60_t30(rir_after)
 
     if (rt60_before == rt60_before) and (rt60_after == rt60_after) and (rt60_after > rt60_before):
         rt60_flag = "rt60_after_gt_before_check_decay_fit"
     else:
         rt60_flag = "ok"
 
-    # CLAP auralisation (clearer than raw RIR audio)
     clap = make_clap()
     clap_before = convolve_wet(clap, rir_before)
     clap_after = convolve_wet(clap, rir_after)
 
-    clap_before_file = f"clap_before.wav"
-    clap_after_file = f"clap_after.wav"
+    clap_before_file = "clap_before.wav"
+    clap_after_file = "clap_after.wav"
     save_wav(os.path.join(run_dir, clap_before_file), clap_before)
     save_wav(os.path.join(run_dir, clap_after_file), clap_after)
 
-    # SPEECH auralisation (wet + dry mix to keep intelligible)
     wet_before = convolve_wet(dry, rir_before)
     wet_after = convolve_wet(dry, rir_after)
 
     speech_before = mix_wet_dry(dry, wet_before, wet_ratio=0.35)
     speech_after = mix_wet_dry(dry, wet_after, wet_ratio=0.35)
 
-    speech_before_file = f"speech_before.wav"
-    speech_after_file = f"speech_after.wav"
+    speech_before_file = "speech_before.wav"
+    speech_after_file = "speech_after.wav"
     save_wav(os.path.join(run_dir, speech_before_file), speech_before)
     save_wav(os.path.join(run_dir, speech_after_file), speech_after)
 
-    # Return URLs for FE
     return {
         "run_folder": run_folder,
         "clap_before_audio": f"/static/audio/{run_folder}/{clap_before_file}",
@@ -229,4 +264,14 @@ def generate_audio(L, W, H, wall_a, floor_a, ceil_a, panels):
         "effective_wall_a_after": float(wall_a_after),
         "panel_coverage": panel_coverage_from_rects(panels),
         "rt60_check_flag": rt60_flag,
+        "source_position": {
+            "x": float(src_pos[0]),
+            "y": float(src_pos[1]),
+            "z": float(src_pos[2]),
+        },
+        "listener_position": {
+            "x": float(mic_pos[0]),
+            "y": float(mic_pos[1]),
+            "z": float(mic_pos[2]),
+        },
     }

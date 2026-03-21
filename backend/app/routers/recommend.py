@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List
@@ -7,12 +6,14 @@ from app.services.ga_service import run_ga
 
 router = APIRouter(prefix="/recommend-panels", tags=["recommend"])
 
+
 class ExclusionRect(BaseModel):
     wall: str = Field(..., description="north|south|east|west")
     x1: float = Field(..., ge=0, le=1)
     x2: float = Field(..., ge=0, le=1)
     z1: float = Field(..., ge=0, le=1)
     z2: float = Field(..., ge=0, le=1)
+
 
 class RecommendRequest(BaseModel):
     L: float = Field(..., gt=0, description="Room length (meters)")
@@ -27,18 +28,22 @@ class RecommendRequest(BaseModel):
 
 class PanelRect(BaseModel):
     wall: str
-    # Normalized coordinates (0-1)
+
     x1: float
     x2: float
     z1: float
     z2: float
-    # Physical dimensions (meters)
+
     x1_m: float
     x2_m: float
     z1_m: float
     z2_m: float
     width_m: float
     height_m: float
+
+    panel_w_m: float
+    panel_h_m: float
+    panel_label: str
 
 
 class RecommendResponse(BaseModel):
@@ -50,27 +55,33 @@ class RecommendResponse(BaseModel):
     total_panel_area_m2: float
 
 
-def _add_physical_dimensions(panel: dict, L: float, W: float, H: float) -> PanelRect:
+def _panel_label(width_m: float, height_m: float) -> str:
+    w_mm = int(round(width_m * 1000))
+    h_mm = int(round(height_m * 1000))
+    return f"{w_mm}x{h_mm}mm"
 
+
+def _add_physical_dimensions(panel: dict, L: float, W: float, H: float) -> PanelRect:
     wall = panel["wall"]
-    
-    # Determine wall dimensions
+
     if wall in ["north", "south"]:
-        wall_width = L  # Length of room
-    else:  # east, west
-        wall_width = W  # Width of room
-    
+        wall_width = L
+    else:
+        wall_width = W
+
     wall_height = H
-    
-    # Convert normalized (0-1) to meters
+
     x1_m = panel["x1"] * wall_width
     x2_m = panel["x2"] * wall_width
     z1_m = panel["z1"] * wall_height
     z2_m = panel["z2"] * wall_height
-    
+
     width_m = x2_m - x1_m
     height_m = z2_m - z1_m
-    
+
+    panel_w_m = float(panel.get("panel_w_m", width_m))
+    panel_h_m = float(panel.get("panel_h_m", height_m))
+
     return PanelRect(
         wall=wall,
         x1=panel["x1"],
@@ -83,16 +94,17 @@ def _add_physical_dimensions(panel: dict, L: float, W: float, H: float) -> Panel
         z2_m=round(z2_m, 3),
         width_m=round(width_m, 3),
         height_m=round(height_m, 3),
+        panel_w_m=round(panel_w_m, 3),
+        panel_h_m=round(panel_h_m, 3),
+        panel_label=_panel_label(panel_w_m, panel_h_m),
     )
 
 
 @router.post("", response_model=RecommendResponse)
 async def recommend_panels(req: RecommendRequest):
     try:
-        # Convert exclusions to dict format
         exclusions = [ex.model_dump() for ex in req.exclusions]
-        
-        # Call GA optimizer
+
         result = run_ga(
             L=req.L,
             W=req.W,
@@ -102,20 +114,18 @@ async def recommend_panels(req: RecommendRequest):
             ceil_a=req.ceil_a,
             exclusions=exclusions,
             max_coverage=req.target_coverage,
-            population=40,      # Population size
-            generations=30,     # Number of generations
-            seed=None,          # Random seed (None for variety)
+            population=40,
+            generations=30,
+            seed=None,#Change to None for deterministic results
         )
-        
-        # Add physical dimensions to each panel
+
         panels_with_dims = [
             _add_physical_dimensions(p, req.L, req.W, req.H)
             for p in result["panels"]
         ]
-        
-        # Calculate total panel area in m²
+
         total_area_m2 = sum(p.width_m * p.height_m for p in panels_with_dims)
-        
+
         return RecommendResponse(
             used_coverage=result["used_coverage"],
             panels=panels_with_dims,
@@ -124,6 +134,6 @@ async def recommend_panels(req: RecommendRequest):
             rt60_delta=result["rt60_delta"],
             total_panel_area_m2=round(total_area_m2, 2),
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
