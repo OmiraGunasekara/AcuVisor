@@ -469,7 +469,7 @@ const MaterialStep = ({
                                     MATERIALS[cand.label]?.label ||
                                     cand.label) +
                                     ` (a=${cand.alpha ?? MATERIALS[cand.label]?.a ?? "?"})` +
-                                    (cand.label === sug ? " ⭐" : "")}
+                                    (cand.label === sug ? " *" : "")}
                                 </option>
                               ))
                             : Object.entries(MATERIALS).map(([k, v]) => (
@@ -895,7 +895,7 @@ const Dashboard = ({
                 <span className="font-semibold text-green-600">{fmt(rt60?.rt60_after)}s</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Δ (before − after)</span>
+                <span className="text-slate-500">Delta (before - after)</span>
                 <span className="font-semibold text-slate-800">{fmt(rt60?.rt60_delta)}s</span>
               </div>
             </div>
@@ -974,7 +974,7 @@ const Dashboard = ({
           <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-100 flex gap-3">
             <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-blue-800">
-              Source, listener, and exclusions were placed in the 3D room editor before optimization.
+              Blue panels are recommended treatment, red areas are your manual exclusions, and amber source-clearance zones are added automatically only when the source is very close to a wall.
             </div>
           </div>
         </div>

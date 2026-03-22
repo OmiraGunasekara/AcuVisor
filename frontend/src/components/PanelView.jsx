@@ -255,6 +255,7 @@ function RoomScene({
   H,
   panels,
   exclusions,
+  sourceClearanceZones,
   source,
   listener,
   interactive = false,
@@ -279,6 +280,11 @@ function RoomScene({
     [exclusions, L, W, H]
   );
 
+
+  const sourceClearanceMeshes = useMemo(
+    () => sourceClearanceZones.map((zone) => buildWallItemMesh(zone, L, W, H, 0.02, 0.045)).filter(Boolean),
+    [sourceClearanceZones, L, W, H]
+  );
   const previewMesh = useMemo(
     () => (hoveredExclusion ? buildWallItemMesh(hoveredExclusion, L, W, H, 0.015, 0.045) : null),
     [hoveredExclusion, L, W, H]
@@ -467,6 +473,18 @@ function RoomScene({
           />
         ))}
 
+
+        {sourceClearanceMeshes.map((mesh, index) => (
+          <SurfaceBox
+            key={`source-clearance-${index}`}
+            position={mesh.position}
+            size={mesh.size}
+            color="#fbbf24"
+            edgeColor="#d97706"
+            opacity={0.34}
+            metalness={0.02}
+          />
+        ))}
         {panelMeshes.map((mesh, index) => (
           <SurfaceBox
             key={`panel-${index}`}
@@ -531,6 +549,7 @@ export default function PanelView({
 }) {
   const panels = recommendation?.panels ?? [];
   const responseExclusions = recommendation?.exclusions ?? exclusions ?? [];
+  const sourceClearanceZones = recommendation?.source_clearance_zones ?? [];
   const [viewPreset, setViewPreset] = useState(interactive ? "top" : "iso");
   const [showLabels, setShowLabels] = useState(true);
 
@@ -594,6 +613,10 @@ export default function PanelView({
             <span className="text-slate-600">Exclusions</span>
           </div>
           <div className="flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-sm bg-amber-400" />
+            <span className="text-slate-600">Source Clearance</span>
+          </div>
+          <div className="flex items-center gap-2">
             <span className="inline-block h-3 w-3 rounded-full bg-emerald-500" />
             <span className="text-slate-600">Source</span>
           </div>
@@ -604,6 +627,11 @@ export default function PanelView({
         </div>
       </div>
 
+      {sourceClearanceZones.length > 0 && (
+        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Amber source-clearance zones are reserved automatically when the source sits very close to a wall, so panels are not placed unrealistically around it.
+        </div>
+      )}
       <div className="mb-3 text-sm text-slate-600">{helperText}</div>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         {VIEW_PRESETS.map((preset) => (
@@ -666,6 +694,7 @@ export default function PanelView({
               H={Number(H)}
               panels={panels}
               exclusions={responseExclusions}
+              sourceClearanceZones={sourceClearanceZones}
               source={source}
               listener={listener}
               interactive={interactive}

@@ -87,6 +87,7 @@ class RecommendResponse(BaseModel):
     room: RoomInfo
     panels: List[PanelRect]
     exclusions: List[ExclusionRectResponse]
+    source_clearance_zones: List[ExclusionRectResponse] = Field(default_factory=list)
     metrics: RecommendMetrics
 
 
@@ -190,6 +191,11 @@ async def recommend_panels(req: RecommendRequest):
             for ex in exclusions
         ]
 
+        source_clearance_with_dims = [
+            _add_exclusion_dimensions(ex, req.L, req.W, req.H)
+            for ex in result.get("source_clearance_zones", [])
+        ]
+
         total_area_m2 = sum(p.width_m * p.height_m for p in panels_with_dims)
 
         return RecommendResponse(
@@ -200,6 +206,7 @@ async def recommend_panels(req: RecommendRequest):
             ),
             panels=panels_with_dims,
             exclusions=exclusions_with_dims,
+            source_clearance_zones=source_clearance_with_dims,
             metrics=RecommendMetrics(
                 used_coverage=round(result["used_coverage"], 6),
                 rt60_before=round(result["rt60_before"], 6),

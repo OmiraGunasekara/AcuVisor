@@ -1,14 +1,14 @@
 """
-ga_service.py — AcuVisor panel placement optimiser.
+ga_service.py - AcuVisor panel placement optimiser.
 
 Changes from previous version
 ------------------------------
-Three additions only — everything else is identical to your uploaded version:
+Three additions only - everything else is identical to your uploaded version:
 
 1. _first_reflection_fracs()
    New helper that computes where sound from the source first bounces
    off each wall before reaching the listener (image-source geometry).
-   Returns a normalised fraction (0–1) along each wall's width.
+   Returns a normalised fraction (0-1) along each wall's width.
 
 2. _fitness() gains optional src / mic parameters
    A small bonus (-0.01 per panel) is applied when a panel lands within
@@ -26,14 +26,14 @@ from typing import Dict, List, Optional, Tuple
 
 from app.services.ml_service import predict_rt60
 
-# ── Constants ─────────────────────────────────────────────────────────────────
+# -- Constants ---------------------------------------------------------------
 
 WALLS: List[str] = ["north", "south", "east", "west"]
 
 PANEL_SIZES_M: List[Tuple[float, float]] = [
-    (0.6, 1.2),   # 0 — tall portrait
-    (1.2, 1.2),   # 1 — large square
-    (0.6, 0.6),   # 2 — small square / accent panel
+    (0.6, 1.2),   # 0 - tall portrait
+    (1.2, 1.2),   # 1 - large square
+    (0.6, 0.6),   # 2 - small square / accent panel
 ]
 
 Z_MIN_M  = 0.6
@@ -61,6 +61,9 @@ ZONE_NAMES = list(ZONES.keys())
 
 PANEL_GAP_M   = 0.05
 EDGE_MARGIN_M = 0.25
+SOURCE_WALL_BLOCK_TRIGGER_M = 0.3
+SOURCE_WALL_BLOCK_HALF_WIDTH_M = 0.35
+SOURCE_WALL_BLOCK_HALF_HEIGHT_M = 0.4
 
 MAX_CLUSTERS = 8
 MIN_PANELS   = 4
@@ -70,7 +73,7 @@ POPULATION   = 40
 GENERATIONS  = 50
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# -- Helpers ----------------------------------------------------------------
 
 def _ww(wall: str, L: float, W: float) -> float:
     return float(L) if wall in ("north", "south") else float(W)
@@ -118,7 +121,52 @@ def _clamp_position(pos: List[float], L: float, W: float, H: float) -> List[floa
     ]
 
 
-# ── First-reflection geometry ─────────────────────────────────────────────────
+
+def _source_near_wall_exclusions(
+    L: float,
+    W: float,
+    H: float,
+    src: Optional[List[float]],
+) -> List[Dict]:
+    """
+    When the source is very close to a wall, reserve a small patch on that
+    wall around the source projection so panels are not placed there.
+    """
+    if not src:
+        return []
+
+    sx, sy, sz = _clamp_position(src, L, W, H)
+    wall_distances = [
+        ("south", sy),
+        ("north", W - sy),
+        ("west", sx),
+        ("east", L - sx),
+    ]
+    wall, distance = min(wall_distances, key=lambda item: item[1])
+    if distance > SOURCE_WALL_BLOCK_TRIGGER_M:
+        return []
+
+    wall_w = _ww(wall, L, W)
+    wall_h = float(H)
+    along_wall_m = sx if wall in ("north", "south") else sy
+
+    x1_m = max(0.0, along_wall_m - SOURCE_WALL_BLOCK_HALF_WIDTH_M)
+    x2_m = min(wall_w, along_wall_m + SOURCE_WALL_BLOCK_HALF_WIDTH_M)
+    z1_m = max(0.0, sz - SOURCE_WALL_BLOCK_HALF_HEIGHT_M)
+    z2_m = min(wall_h, sz + SOURCE_WALL_BLOCK_HALF_HEIGHT_M)
+
+    if x2_m - x1_m < 0.05 or z2_m - z1_m < 0.05:
+        return []
+
+    return [{
+        "wall": wall,
+        "x1": _clamp01(x1_m / wall_w),
+        "x2": _clamp01(x2_m / wall_w),
+        "z1": _clamp01(z1_m / wall_h),
+        "z2": _clamp01(z2_m / wall_h),
+    }]
+
+# -- First-reflection geometry ----------------------------------------------
 
 def _first_reflection_fracs(
     L: float, W: float,
@@ -132,7 +180,7 @@ def _first_reflection_fracs(
     Returns a dict: wall name -> normalised fraction (0-1) along that
     wall's width where the first reflection lands.
 
-    This is pure geometry — it does not touch the ML model at all.
+    This is pure geometry - it does not touch the ML model at all.
     Returns an empty dict if positions are missing or degenerate.
     """
     if not src or not mic:
@@ -170,12 +218,12 @@ def _first_reflection_fracs(
     except Exception:
         return {}
 
-    # Clamp to [0.05, 0.95] — reflection must actually land on the wall
+    # Clamp to [0.05, 0.95] - reflection must actually land on the wall
     return {wall: max(0.05, min(0.95, float(frac)))
             for wall, frac in fracs.items()}
 
 
-# ── Grid cluster placement ────────────────────────────────────────────────────
+# -- Grid cluster placement --------------------------------------------------
 
 def _place_grid(
     wall: str, zone: str, size_idx: int,
@@ -244,7 +292,7 @@ def _place_grid(
     return panels, norm_area
 
 
-# ── Chromosome ────────────────────────────────────────────────────────────────
+# -- Chromosome --------------------------------------------------------------
 
 Gene       = Tuple[int, int, int, int, int, int]
 Chromosome = List[Gene]
@@ -287,7 +335,7 @@ def decode(chrom: Chromosome,
     return all_panels, total_cov
 
 
-# ── Fitness ───────────────────────────────────────────────────────────────────
+# -- Fitness -----------------------------------------------------------------
 
 def _fitness(chrom: Chromosome,
              L: float, W: float, H: float,
@@ -313,13 +361,13 @@ def _fitness(chrom: Chromosome,
     # Penalise under-using coverage budget
     score += abs(cov - max_coverage) * 0.15
 
-    # Bonus: panels at ear-height zone (z_mid 0.9–1.8 m)
+    # Bonus: panels at ear-height zone (z_mid 0.9-1.8 m)
     for p in panels:
         z_mid = ((p["z1"] + p["z2"]) / 2.0) * H
         if 0.9 <= z_mid <= 1.8:
             score -= 0.012
 
-    # ── Height variety bonus ──────────────────────────────────────────────────
+    # -- Height variety bonus ------------------------------------------------
     wall_z_bottoms: Dict[str, List[float]] = {}
     for p in panels:
         wall_z_bottoms.setdefault(p["wall"], []).append(p["z1_m"])
@@ -332,7 +380,7 @@ def _fitness(chrom: Chromosome,
                     score -= 0.04
                     break
 
-    # ── Penalise walls where 600x600mm is the only panel size ────────────────
+    # -- Penalise walls where 600x600mm is the only panel size ---------------
     wall_max_ph: Dict[str, float] = {}
     for p in panels:
         ph = round(p["panel_h_m"], 2)
@@ -341,7 +389,7 @@ def _fitness(chrom: Chromosome,
         if max_ph < 1.19:
             score += 0.35
 
-    # ── Mixed-size penalty only at the same height ────────────────────────────
+    # -- Mixed-size penalty only at the same height --------------------------
     wall_height_sizes: Dict[str, Dict[float, set]] = {}
     for p in panels:
         z_band = round(p["z1_m"], 1)
@@ -353,7 +401,7 @@ def _fitness(chrom: Chromosome,
             if len(sizes) > 1:
                 score += 0.25
 
-    # ── First-reflection bonus ────────────────────────────────────────────────
+    # -- First-reflection bonus ----------------------------------------------
     # Panels placed near the first reflection point absorb the most
     # acoustically critical early reflections. Bonus is kept small
     # (~0.01 per panel) so it guides placement without overriding RT60.
@@ -372,7 +420,7 @@ def _fitness(chrom: Chromosome,
     return score
 
 
-# ── Genetic operators ─────────────────────────────────────────────────────────
+# -- Genetic operators -------------------------------------------------------
 
 def _crossover(a: Chromosome, b: Chromosome) -> Chromosome:
     if not a: return list(b)
@@ -410,7 +458,7 @@ def _mutate(chrom: Chromosome) -> Chromosome:
     return [tuple(g) for g in child]
 
 
-# ── Warm start ────────────────────────────────────────────────────────────────
+# -- Warm start --------------------------------------------------------------
 
 def _z_idx(z: float, H: float = 2.8) -> int:
     opts = _z_options(H)
@@ -437,7 +485,7 @@ def _warm_start(L: float, W: float, H: float,
     ]
 
 
-# ── Main GA ───────────────────────────────────────────────────────────────────
+# -- Main GA -----------------------------------------------------------------
 
 def run_ga(
     L: float,
@@ -457,7 +505,7 @@ def run_ga(
     """
     Optimise acoustic panel placement using zone-based grid cluster chromosomes.
 
-    src / mic — source and listener positions [x, y, z] in metres.
+    src / mic - source and listener positions [x, y, z] in metres.
                 Used only to compute first-reflection bonuses in fitness.
                 Defaults to canonical positions when not supplied.
                 Routers may pass user-selected positions directly.
@@ -472,6 +520,8 @@ def run_ga(
 
     src = _clamp_position(src, L, W, H)
     mic = _clamp_position(mic, L, W, H)
+    source_clearance_zones = _source_near_wall_exclusions(L, W, H, src)
+    effective_exclusions = list(exclusions) + source_clearance_zones
 
     if seed is None:
         seed = _seed_from_inputs(L, W, H, wall_a, floor_a, ceil_a, max_coverage, src, mic)
@@ -485,7 +535,7 @@ def run_ga(
 
     best_chrom = list(warm)
     best_fit   = _fitness(warm, L, W, H, wall_a, floor_a, ceil_a,
-                          max_coverage, exclusions, src, mic)
+                          max_coverage, effective_exclusions, src, mic)
     no_improve = 0
 
     for _gen in range(generations):
@@ -493,7 +543,7 @@ def run_ga(
 
         for chrom in pop:
             f = _fitness(chrom, L, W, H, wall_a, floor_a, ceil_a,
-                         max_coverage, exclusions, src, mic)
+                         max_coverage, effective_exclusions, src, mic)
             scored.append((f, chrom))
             if f < best_fit:
                 best_fit   = f
@@ -525,7 +575,7 @@ def run_ga(
 
         pop = new_pop
 
-    best_panels, used_cov = decode(best_chrom, L, W, H, exclusions)
+    best_panels, used_cov = decode(best_chrom, L, W, H, effective_exclusions)
     used_cov = _clamp01(used_cov)
 
     rt60_before = float(predict_rt60(L, W, H, wall_a, floor_a, ceil_a, 0.0))
@@ -536,5 +586,7 @@ def run_ga(
         "rt60_before":   rt60_before,
         "rt60_after":    rt60_after,
         "rt60_delta":    float(rt60_before - rt60_after),
+        "applied_exclusions": effective_exclusions,
+        "source_clearance_zones": source_clearance_zones,
         "panels":        best_panels,
     }
