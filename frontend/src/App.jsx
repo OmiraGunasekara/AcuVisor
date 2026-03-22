@@ -552,6 +552,7 @@ const EditorStep = ({
   setListener,
   exclusions,
   setExclusions,
+  busy,
   onBack,
   onNext,
 }) => {
@@ -800,9 +801,15 @@ const EditorStep = ({
             </button>
             <button
               onClick={onNext}
-              className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-500"
+              disabled={busy.rec}
+              className={`flex-1 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
+                busy.rec
+                  ? "bg-blue-400 text-white cursor-wait"
+                  : "bg-blue-600 text-white hover:bg-blue-500"
+              }`}
             >
-              Generate Recommendation
+              {busy.rec ? <RefreshCw className="w-4 h-4 animate-spin" /> : null}
+              {busy.rec ? "Generating Recommendation" : "Generate Recommendation"}
             </button>
           </div>
         </div>
@@ -1116,6 +1123,12 @@ export default function App() {
         wall_a: Number(wall_a),
         floor_a: Number(floor_a),
         ceil_a: Number(ceil_a),
+        src_x: Number(source.x),
+        src_y: Number(source.y),
+        src_z: Number(source.z),
+        mic_x: Number(listener.x),
+        mic_y: Number(listener.y),
+        mic_z: Number(listener.z),
         target_coverage: 0.5,
         exclusions: exclusions,
       };
@@ -1259,6 +1272,7 @@ export default function App() {
             setListener={setListener}
             exclusions={exclusions}
             setExclusions={setExclusions}
+            busy={busy}
             onBack={() => setStep(2)}
             onNext={onRecommendPanels}
           />
@@ -1290,3 +1304,5 @@ export default function App() {
     </div>
   );
 }
+
+

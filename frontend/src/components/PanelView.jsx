@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { Edges, Html, OrbitControls } from "@react-three/drei";
+import { MOUSE } from "three";
 
 const VIEW_PRESETS = [
   { id: "iso", label: "Iso" },
@@ -143,11 +144,13 @@ function Marker({ position, color, label }) {
         <sphereGeometry args={[0.12, 24, 24]} />
         <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.25} />
       </mesh>
-      <Html position={[0, 0.32, 0]} center style={{ pointerEvents: "none" }}>
-        <div className="rounded-full border border-white/70 bg-slate-900/85 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white shadow-lg backdrop-blur-sm">
-          {label}
-        </div>
-      </Html>
+      {label && (
+        <Html position={[0, 0.32, 0]} center style={{ pointerEvents: "none" }}>
+          <div className="rounded-full border border-white/70 bg-slate-900/85 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white shadow-lg backdrop-blur-sm">
+            {label}
+          </div>
+        </Html>
+      )}
     </group>
   );
 }
@@ -259,6 +262,7 @@ function RoomScene({
   exclusionSize,
   viewPreset,
   onPlaceSource,
+  showLabels = true,
   onPlaceListener,
   onAddExclusion,
 }) {
@@ -354,6 +358,7 @@ function RoomScene({
 
   const wallLabelHeight = clamp(H * 0.58, 0.8, Math.max(H - 0.2, 0.8));
   const placementLocked = interactive && editTool !== "none";
+  const allowIsoContextOrbit = interactive && editTool === "exclusion" && viewPreset === "iso";
 
   return (
     <>
@@ -425,15 +430,19 @@ function RoomScene({
           edgeColor="#cbd5e1"
           opacity={0.08}
         />
+        {showLabels && (
+          <>
+            <WallBadge position={[L / 2, wallLabelHeight, W + 0.22]} label="North Wall" />
+            <WallBadge position={[L / 2, wallLabelHeight, -0.22]} label="South Wall" />
+            <WallBadge position={[L + 0.22, wallLabelHeight, W / 2]} label="East Wall" />
+            <WallBadge position={[-0.22, wallLabelHeight, W / 2]} label="West Wall" />
+            <WallBadge
+              position={[L / 2, Math.max(H + 0.22, 0.9), W / 2]}
+              label={`${fmt(L)}m x ${fmt(W)}m x ${fmt(H)}m`}
+            />
+          </>
+        )}
 
-        <WallBadge position={[L / 2, wallLabelHeight, W + 0.22]} label="North Wall" />
-        <WallBadge position={[L / 2, wallLabelHeight, -0.22]} label="South Wall" />
-        <WallBadge position={[L + 0.22, wallLabelHeight, W / 2]} label="East Wall" />
-        <WallBadge position={[-0.22, wallLabelHeight, W / 2]} label="West Wall" />
-        <WallBadge
-          position={[L / 2, Math.max(H + 0.22, 0.9), W / 2]}
-          label={`${fmt(L)}m x ${fmt(W)}m x ${fmt(H)}m`}
-        />
 
         {previewMesh && interactive && editTool === "exclusion" && (
           <SurfaceBox
@@ -469,9 +478,16 @@ function RoomScene({
             metalness={0.1}
           />
         ))}
-
-        {sourcePosition && <Marker position={sourcePosition} color="#10b981" label="Source" />}
-        {listenerPosition && <Marker position={listenerPosition} color="#8b5cf6" label="Listener" />}
+        {sourcePosition && (
+          <Marker position={sourcePosition} color="#10b981" label={showLabels ? "Source" : null} />
+        )}
+        {listenerPosition && (
+          <Marker
+            position={listenerPosition}
+            color="#8b5cf6"
+            label={showLabels ? "Listener" : null}
+          />
+        )}
       </group>
 
       <OrbitControls
@@ -479,7 +495,12 @@ function RoomScene({
         makeDefault
         enablePan={!placementLocked}
         enableZoom
-        enableRotate={!placementLocked}
+        enableRotate={!placementLocked || allowIsoContextOrbit}
+        mouseButtons={
+          allowIsoContextOrbit
+            ? { LEFT: -1, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.ROTATE }
+            : undefined
+        }
         enableDamping
         dampingFactor={0.08}
         rotateSpeed={0.75}
@@ -511,6 +532,7 @@ export default function PanelView({
   const panels = recommendation?.panels ?? [];
   const responseExclusions = recommendation?.exclusions ?? exclusions ?? [];
   const [viewPreset, setViewPreset] = useState(interactive ? "top" : "iso");
+  const [showLabels, setShowLabels] = useState(true);
 
   useEffect(() => {
     if (!interactive) return;
@@ -535,8 +557,22 @@ export default function PanelView({
       : editTool === "listener"
       ? "Top view is selected for accurate listener placement. Click the floor to set x/y and fine-tune height from the inputs."
       : editTool === "exclusion"
-      ? "Choose a wall view, hover to preview the rectangle, then click to place the exclusion on that wall."
+      ? "Choose a wall view, hover to preview the rectangle, then click to place the exclusion on that wall. In ISO view, right-drag orbits without changing left-click placement."
       : "Orbit, zoom, inspect the room, and use the wall labels to understand the directions.";
+
+  const disabledPresets = useMemo(() => {
+    if (!interactive) return new Set();
+
+    if (editTool === "source" || editTool === "listener") {
+      return new Set(["iso", "north", "south", "east", "west"]);
+    }
+
+    if (editTool === "exclusion") {
+      return new Set(["top"]);
+    }
+
+    return new Set();
+  }, [interactive, editTool]);
 
   return (
     <div className="w-full">
@@ -569,28 +605,54 @@ export default function PanelView({
       </div>
 
       <div className="mb-3 text-sm text-slate-600">{helperText}</div>
-
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         {VIEW_PRESETS.map((preset) => (
           <button
             key={preset.id}
             type="button"
             onClick={() => setViewPreset(preset.id)}
+            disabled={disabledPresets.has(preset.id)}
             className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] transition ${
               viewPreset === preset.id
                 ? "border-slate-900 bg-slate-900 text-white"
+                : disabledPresets.has(preset.id)
+                ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
                 : "border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50"
             }`}
           >
             {preset.label}
           </button>
         ))}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={showLabels}
+          onClick={() => setShowLabels((prev) => !prev)}
+          className="ml-auto inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+        >
+          <span>Labels</span>
+          <span
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              showLabels ? "bg-slate-900" : "bg-slate-300"
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                showLabels ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </span>
+        </button>
       </div>
-
       <div className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
         <div className="h-[clamp(18rem,46vh,34rem)]">
           <Canvas
             shadows={false}
+            onContextMenu={(event) => {
+              if (interactive && editTool === "exclusion" && viewPreset === "iso") {
+                event.preventDefault();
+              }
+            }}
             camera={{
               position: [cameraDistance, cameraHeight, cameraDistance],
               fov: 42,
@@ -610,6 +672,7 @@ export default function PanelView({
               editTool={editTool}
               exclusionSize={exclusionSize}
               viewPreset={viewPreset}
+              showLabels={showLabels}
               onPlaceSource={onPlaceSource}
               onPlaceListener={onPlaceListener}
               onAddExclusion={onAddExclusion}
@@ -634,7 +697,9 @@ export default function PanelView({
             {recommendation ? "Coverage" : "Room Volume"}
           </div>
           <div className="text-2xl font-bold text-slate-900">
-            {recommendation ? `${fmt((recommendation?.metrics?.used_coverage ?? 0) * 100, 1)}%` : `${fmt(roomVolume, 1)}m3`}
+            {recommendation
+              ? `${fmt((recommendation?.metrics?.used_coverage ?? 0) * 100, 1)}%`
+              : `${fmt(roomVolume, 1)}m3`}
           </div>
         </div>
       </div>

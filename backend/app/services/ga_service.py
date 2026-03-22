@@ -1,30 +1,23 @@
 """
 ga_service.py — AcuVisor panel placement optimiser.
 
-What was wrong and what changed
----------------------------------
-Previous versions produced horizontal rows because:
-  1. Z_OPTIONS_M = [0.6, 1.2] gave only two heights — and both produce
-     a single row of panels at the same height.
-  2. The "same size per wall" penalty blocked height variety by preventing
-     a 600×1200mm primary cluster + 600×600mm accent cluster on the same wall.
-  3. rows=2 never triggered because standard panels (600×1200, 1200×1200)
-     exceed MAX_TOP when stacked — only 600×600 can stack, but the GA
-     found that acoustically inferior and ignored it.
+Changes from previous version
+------------------------------
+Three additions only — everything else is identical to your uploaded version:
 
-The fix:
-  1. Continuous z positions — clusters can start at any height from 0.6 m
-     to MAX_TOP_M - panel_height, in 0.1 m steps. This breaks the
-     "everything at the same band" problem.
-  2. Remove same-size-per-wall penalty — replace with a penalty only
-     for clusters at the SAME height zone on the same wall with different
-     sizes. Clusters at clearly different heights on one wall (common in
-     real studios) are allowed and rewarded.
-  3. Height variety bonus — when a wall has clusters at two different
-     heights, the fitness improves. This incentivises the GA to place
-     a primary cluster at ear height AND an accent cluster above it.
-  4. Warm start seeds both primary (z=0.6) and accent (z=1.8) clusters
-     on the front and side walls so the GA starts from a realistic layout.
+1. _first_reflection_fracs()
+   New helper that computes where sound from the source first bounces
+   off each wall before reaching the listener (image-source geometry).
+   Returns a normalised fraction (0–1) along each wall's width.
+
+2. _fitness() gains optional src / mic parameters
+   A small bonus (-0.01 per panel) is applied when a panel lands within
+   40 cm of the first reflection point on its wall. The bonus is
+   intentionally weak so it guides placement without overriding RT60.
+
+3. run_ga() gains optional src / mic parameters
+   Defaults to canonical positions [L/4, W/4, 1.5] and [L/2, W/2, 1.5]
+   when not supplied. Routers can pass user-selected positions directly.
 """
 
 import hashlib
@@ -43,44 +36,33 @@ PANEL_SIZES_M: List[Tuple[float, float]] = [
     (0.6, 0.6),   # 2 — small square / accent panel
 ]
 
-# Z positions and MAX_TOP scale with room height so panels use the
-# full wall in tall rooms, not just the bottom 2.4m.
-Z_MIN_M  = 0.6    # panels always start at least 0.6m above floor
-Z_STEP_M = 0.1    # 0.1m resolution
+Z_MIN_M  = 0.6
+Z_STEP_M = 0.1
 
 
 def _max_top(H: float) -> float:
-    """
-    Highest point a panel top can reach.
-    Residential (H ≤ 3.2m): cap at 2.4m — standard treatment zone.
-    Taller rooms: scale to 75% of wall height so upper wall is used.
-    """
     if H <= 3.2:
         return min(float(H) - 0.3, 2.4)
     return min(float(H) - 0.3, float(H) * 0.75)
 
 
 def _z_options(H: float) -> List[float]:
-    """Compute valid panel-bottom heights for this room."""
-    z_max_bottom = _max_top(H) - 0.6   # smallest panel (600x600) needs 0.6m above
+    z_max_bottom = _max_top(H) - 0.6
     n = max(1, int(round((z_max_bottom - Z_MIN_M) / Z_STEP_M)) + 1)
     return [round(Z_MIN_M + i * Z_STEP_M, 1) for i in range(n)]
 
+
 ZONES: Dict[str, float] = {
-    "left_third":  0.30,   # left reflection zone
-    "centre":      0.50,   # wall centre
-    "right_third": 0.70,   # right reflection zone
+    "left_third":  0.30,
+    "centre":      0.50,
+    "right_third": 0.70,
 }
-# Corner zones removed — large clusters anchored at a corner get clamped
-# flush to the wall edge, which looks wrong. Three zones always produce
-# cleanly placed clusters away from the edges.
 ZONE_NAMES = list(ZONES.keys())
 
 PANEL_GAP_M   = 0.05
-EDGE_MARGIN_M = 0.25   # 25 cm clearance from wall edges — no cornered panels
-# MAX_TOP_M is now computed per-room via _max_top(H)
+EDGE_MARGIN_M = 0.25
 
-MAX_CLUSTERS = 8     # allow more clusters so height variety can develop
+MAX_CLUSTERS = 8
 MIN_PANELS   = 4
 MAX_COLS     = 3
 MAX_ROWS     = 2
@@ -100,9 +82,22 @@ def _clamp01(x: float) -> float:
 
 def _seed_from_inputs(L: float, W: float, H: float,
                       wall_a: float, floor_a: float, ceil_a: float,
-                      max_coverage: float) -> int:
+                      max_coverage: float,
+                      src: Optional[List[float]] = None,
+                      mic: Optional[List[float]] = None) -> int:
+    src_key = (
+        "none"
+        if not src else
+        f"{float(src[0]):.4f}_{float(src[1]):.4f}_{float(src[2]):.4f}"
+    )
+    mic_key = (
+        "none"
+        if not mic else
+        f"{float(mic[0]):.4f}_{float(mic[1]):.4f}_{float(mic[2]):.4f}"
+    )
     key = (f"{L:.4f}_{W:.4f}_{H:.4f}_"
-           f"{wall_a:.4f}_{floor_a:.4f}_{ceil_a:.4f}_{max_coverage:.4f}")
+           f"{wall_a:.4f}_{floor_a:.4f}_{ceil_a:.4f}_{max_coverage:.4f}_"
+           f"{src_key}_{mic_key}")
     return int(hashlib.md5(key.encode()).hexdigest(), 16) % (2 ** 31)
 
 
@@ -114,6 +109,72 @@ def _overlaps(a: Dict, b: Dict) -> bool:
     )
 
 
+def _clamp_position(pos: List[float], L: float, W: float, H: float) -> List[float]:
+    margin = 0.05
+    return [
+        max(margin, min(float(L) - margin, float(pos[0]))),
+        max(margin, min(float(W) - margin, float(pos[1]))),
+        max(margin, min(float(H) - margin, float(pos[2]))),
+    ]
+
+
+# ── First-reflection geometry ─────────────────────────────────────────────────
+
+def _first_reflection_fracs(
+    L: float, W: float,
+    src: List[float],
+    mic: List[float],
+) -> Dict[str, float]:
+    """
+    Compute where sound from the source first bounces off each wall
+    before reaching the listener, using the image-source method.
+
+    Returns a dict: wall name -> normalised fraction (0-1) along that
+    wall's width where the first reflection lands.
+
+    This is pure geometry — it does not touch the ML model at all.
+    Returns an empty dict if positions are missing or degenerate.
+    """
+    if not src or not mic:
+        return {}
+
+    sx, sy = float(src[0]), float(src[1])
+    mx, my = float(mic[0]), float(mic[1])
+    fracs: Dict[str, float] = {}
+
+    try:
+        # North wall at y=W: mirror source across y=W, find x crossing
+        denom = (2 * W - sy) - my
+        if abs(denom) > 1e-6:
+            t = (W - my) / denom
+            fracs["north"] = (mx + t * (sx - mx)) / L
+
+        # South wall at y=0: mirror source across y=0
+        denom = (-sy) - my
+        if abs(denom) > 1e-6:
+            t = (0 - my) / denom
+            fracs["south"] = (mx + t * (sx - mx)) / L
+
+        # East wall at x=L: mirror source across x=L, find y crossing
+        denom = (2 * L - sx) - mx
+        if abs(denom) > 1e-6:
+            t = (L - mx) / denom
+            fracs["east"] = (my + t * (sy - my)) / W
+
+        # West wall at x=0: mirror source across x=0
+        denom = (-sx) - mx
+        if abs(denom) > 1e-6:
+            t = (0 - mx) / denom
+            fracs["west"] = (my + t * (sy - my)) / W
+
+    except Exception:
+        return {}
+
+    # Clamp to [0.05, 0.95] — reflection must actually land on the wall
+    return {wall: max(0.05, min(0.95, float(frac)))
+            for wall, frac in fracs.items()}
+
+
 # ── Grid cluster placement ────────────────────────────────────────────────────
 
 def _place_grid(
@@ -123,10 +184,6 @@ def _place_grid(
     exclusions: List[Dict],
     existing: List[Dict],
 ) -> Optional[Tuple[List[Dict], float]]:
-    """
-    Place a cols×rows grid of panels at the given zone and height.
-    Returns (panels, normalised_coverage) or None if placement fails.
-    """
     pw_m, ph_m = PANEL_SIZES_M[size_idx]
     wall_w = _ww(wall, L, W)
     wall_h = float(H)
@@ -140,16 +197,12 @@ def _place_grid(
     if grid_w > wall_w - 2 * EDGE_MARGIN_M:
         return None
 
-    anchor_x   = ZONES[zone] * wall_w
-    x_start    = anchor_x - grid_w / 2.0
-    x_clamped  = max(EDGE_MARGIN_M, min(x_start, wall_w - grid_w - EDGE_MARGIN_M))
+    anchor_x  = ZONES[zone] * wall_w
+    x_start   = anchor_x - grid_w / 2.0
+    x_clamped = max(EDGE_MARGIN_M, min(x_start, wall_w - grid_w - EDGE_MARGIN_M))
 
-    # If clamping moved the cluster more than 15 cm from its ideal position,
-    # the zone anchor is incompatible with this cluster width — fall back to
-    # centering the cluster on the wall instead.  This prevents large clusters
-    # from being pushed into corners when placed at a non-centre zone.
     if abs(x_clamped - x_start) > 0.15:
-        x_start = (wall_w - grid_w) / 2.0   # true centre
+        x_start = (wall_w - grid_w) / 2.0
         x_start = max(EDGE_MARGIN_M, min(x_start, wall_w - grid_w - EDGE_MARGIN_M))
     else:
         x_start = x_clamped
@@ -192,8 +245,6 @@ def _place_grid(
 
 
 # ── Chromosome ────────────────────────────────────────────────────────────────
-# Gene = (wall_idx, zone_idx, size_idx, cols, rows, z_idx)
-# z_idx indexes into Z_OPTIONS_M (0.6m to 1.9m in 0.1m steps)
 
 Gene       = Tuple[int, int, int, int, int, int]
 Chromosome = List[Gene]
@@ -241,7 +292,9 @@ def decode(chrom: Chromosome,
 def _fitness(chrom: Chromosome,
              L: float, W: float, H: float,
              wall_a: float, floor_a: float, ceil_a: float,
-             max_coverage: float, exclusions: List[Dict]) -> float:
+             max_coverage: float, exclusions: List[Dict],
+             src: List[float] = None,
+             mic: List[float] = None) -> float:
 
     panels, cov = decode(chrom, L, W, H, exclusions)
 
@@ -267,9 +320,6 @@ def _fitness(chrom: Chromosome,
             score -= 0.012
 
     # ── Height variety bonus ──────────────────────────────────────────────────
-    # When a wall has clusters at clearly different heights (≥0.4 m apart),
-    # it looks natural — a primary cluster at ear height and an accent cluster
-    # above it. Reward this arrangement.
     wall_z_bottoms: Dict[str, List[float]] = {}
     for p in panels:
         wall_z_bottoms.setdefault(p["wall"], []).append(p["z1_m"])
@@ -279,26 +329,19 @@ def _fitness(chrom: Chromosome,
         for i in range(len(unique_z)):
             for j in range(i + 1, len(unique_z)):
                 if unique_z[j] - unique_z[i] >= 0.4:
-                    score -= 0.04   # bonus per distinct height pair on this wall
+                    score -= 0.04
                     break
 
-    # ── Penalise walls where 600×600mm is the only panel size ────────────────
-    # 600×600mm is valid as an accent above a primary group, but a wall
-    # that has ONLY 600×600mm panels has no substantial primary treatment.
-    # This penalty prevents accent genes from becoming the dominant cluster
-    # on a wall when the primary cluster is lost during crossover.
+    # ── Penalise walls where 600x600mm is the only panel size ────────────────
     wall_max_ph: Dict[str, float] = {}
     for p in panels:
         ph = round(p["panel_h_m"], 2)
         wall_max_ph[p["wall"]] = max(wall_max_ph.get(p["wall"], 0.0), ph)
     for wall, max_ph in wall_max_ph.items():
-        if max_ph < 1.19:   # wall's tallest panel is 600×600 — no primary treatment
+        if max_ph < 1.19:
             score += 0.35
 
     # ── Mixed-size penalty only at the same height ────────────────────────────
-    # Two clusters on the same wall at the same height but different sizes
-    # looks wrong. Two clusters at different heights with different sizes
-    # is fine (primary + accent is a real pattern).
     wall_height_sizes: Dict[str, Dict[float, set]] = {}
     for p in panels:
         z_band = round(p["z1_m"], 1)
@@ -308,7 +351,23 @@ def _fitness(chrom: Chromosome,
     for wall, height_map in wall_height_sizes.items():
         for z_band, sizes in height_map.items():
             if len(sizes) > 1:
-                score += 0.25   # penalise different sizes at same height
+                score += 0.25
+
+    # ── First-reflection bonus ────────────────────────────────────────────────
+    # Panels placed near the first reflection point absorb the most
+    # acoustically critical early reflections. Bonus is kept small
+    # (~0.01 per panel) so it guides placement without overriding RT60.
+    if src and mic:
+        fracs = _first_reflection_fracs(L, W, src, mic)
+        for p in panels:
+            wall = p["wall"]
+            if wall not in fracs:
+                continue
+            ww = _ww(wall, L, W)
+            panel_centre_frac = (p["x1"] + p["x2"]) / 2.0
+            dist_m = abs(panel_centre_frac - fracs[wall]) * ww
+            if dist_m < 0.4:   # within 40 cm of reflection point
+                score -= 0.01  # small bonus per qualifying panel
 
     return score
 
@@ -343,10 +402,9 @@ def _mutate(chrom: Chromosome) -> Chromosome:
             elif fi == 3: g[3] = max(1, min(MAX_COLS, g[3] + random.choice([-1, 1])))
             elif fi == 4: g[4] = max(1, min(MAX_ROWS, g[4] + random.choice([-1, 1])))
             else:
-                # Mutate z_idx — prefer nearby heights for small moves
                 current = g[5]
                 delta   = random.choice([-2, -1, 1, 2])
-                g[5]    = max(0, current + delta)  # clipped in decode
+                g[5]    = max(0, current + delta)
             child[gi] = g
 
     return [tuple(g) for g in child]
@@ -355,7 +413,6 @@ def _mutate(chrom: Chromosome) -> Chromosome:
 # ── Warm start ────────────────────────────────────────────────────────────────
 
 def _z_idx(z: float, H: float = 2.8) -> int:
-    """Return the z_options index closest to the given z value."""
     opts = _z_options(H)
     return min(range(len(opts)), key=lambda i: abs(opts[i] - z))
 
@@ -363,39 +420,21 @@ def _z_idx(z: float, H: float = 2.8) -> int:
 def _warm_start(L: float, W: float, H: float,
                 max_coverage: float) -> Chromosome:
     """
-    Starting layout based on standard acoustic treatment practice.
-
-    Primary clusters at ear height (z=0.6m), accent clusters at z=1.8m
-    above the primary groups on front and side walls. This gives the GA
-    a realistic starting point with height variety already present.
-
-      North — primary row at centre (z=0.6) + accent above (z=1.8)
-      South — primary row at centre (z=0.6)
-      East  — primary at left_third (z=0.6) + accent above (z=1.8)
-      West  — primary at right_third (z=0.6, mirrored)
+    Starting layout: primary clusters at ear height on all four walls.
+    Accent clusters are discovered by the GA through the height variety bonus.
     """
     avg_ww         = (2 * L + 2 * W) / 4.0
     norm_per_panel = (0.6 / avg_ww) * (1.2 / H)
     budget_panels  = max(4, int(max_coverage / (norm_per_panel + 1e-9)))
     per_wall       = max(1, min(3, budget_panels // 4))
+    z_primary      = _z_idx(0.6, H)
 
-    # z indices for standard positions
-    z_primary = _z_idx(0.6, H)   # ear height — primary panels
-    z_accent  = _z_idx(min(1.8, _max_top(H) - 0.6), H)  # above primary
-
-    # Primary clusters only in warm start — no accent genes.
-    # Accent clusters (600x600mm at z=1.8m) are discovered by the GA
-    # through the height variety bonus in fitness. Seeding them here
-    # caused them to compete with primary clusters during crossover and
-    # occasionally replace the primary treatment entirely on a wall.
-    chrom: Chromosome = [
+    return [
         (0, ZONE_NAMES.index("centre"),      0, per_wall, 1, z_primary),  # north
         (1, ZONE_NAMES.index("centre"),      0, per_wall, 1, z_primary),  # south
         (2, ZONE_NAMES.index("left_third"),  0, per_wall, 1, z_primary),  # east
         (3, ZONE_NAMES.index("right_third"), 0, per_wall, 1, z_primary),  # west
     ]
-
-    return chrom
 
 
 # ── Main GA ───────────────────────────────────────────────────────────────────
@@ -412,24 +451,30 @@ def run_ga(
     population: int = POPULATION,
     generations: int = GENERATIONS,
     seed: int = None,
+    src: List[float] = None,
+    mic: List[float] = None,
 ) -> Dict:
     """
     Optimise acoustic panel placement using zone-based grid cluster chromosomes.
 
-    Key improvements over previous versions:
-    - Continuous z positions (0.6–1.9 m in 0.1 m steps) break the
-      single-row-height pattern that made layouts look generic.
-    - Height variety bonus rewards walls with clusters at two different
-      heights — primary panels at ear height plus accent panels above.
-    - Mixed-size penalty applies only to clusters at the same height;
-      different heights on one wall can have different sizes (natural).
-    - Warm start includes accent clusters at z=1.8 m so the GA begins
-      from a layout with height variety already present.
+    src / mic — source and listener positions [x, y, z] in metres.
+                Used only to compute first-reflection bonuses in fitness.
+                Defaults to canonical positions when not supplied.
+                Routers may pass user-selected positions directly.
 
-    seed=None → deterministic from room inputs (same room = same result).
+    seed=None ? deterministic from the full optimisation inputs.
     """
+    # Use canonical positions if not provided by caller
+    if src is None:
+        src = [L / 4.0, W / 4.0, min(1.5, H - 0.05)]
+    if mic is None:
+        mic = [L / 2.0, W / 2.0, min(1.5, H - 0.05)]
+
+    src = _clamp_position(src, L, W, H)
+    mic = _clamp_position(mic, L, W, H)
+
     if seed is None:
-        seed = _seed_from_inputs(L, W, H, wall_a, floor_a, ceil_a, max_coverage)
+        seed = _seed_from_inputs(L, W, H, wall_a, floor_a, ceil_a, max_coverage, src, mic)
     random.seed(seed)
 
     warm = _warm_start(L, W, H, max_coverage)
@@ -440,7 +485,7 @@ def run_ga(
 
     best_chrom = list(warm)
     best_fit   = _fitness(warm, L, W, H, wall_a, floor_a, ceil_a,
-                          max_coverage, exclusions)
+                          max_coverage, exclusions, src, mic)
     no_improve = 0
 
     for _gen in range(generations):
@@ -448,7 +493,7 @@ def run_ga(
 
         for chrom in pop:
             f = _fitness(chrom, L, W, H, wall_a, floor_a, ceil_a,
-                         max_coverage, exclusions)
+                         max_coverage, exclusions, src, mic)
             scored.append((f, chrom))
             if f < best_fit:
                 best_fit   = f

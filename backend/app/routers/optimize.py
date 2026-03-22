@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 
 from app.services.ga_service import run_ga
 
@@ -22,6 +22,13 @@ class OptimizeRequest(BaseModel):
     floor_a: float = Field(..., ge=0, le=1)
     ceil_a: float = Field(..., ge=0, le=1)
 
+    src_x: Optional[float] = Field(None, ge=0)
+    src_y: Optional[float] = Field(None, ge=0)
+    src_z: Optional[float] = Field(None, ge=0)
+    mic_x: Optional[float] = Field(None, ge=0)
+    mic_y: Optional[float] = Field(None, ge=0)
+    mic_z: Optional[float] = Field(None, ge=0)
+
     exclusions: List[ExclusionRect] = Field(default_factory=list)
 
     max_coverage: float = Field(0.6, ge=0, le=1)
@@ -39,6 +46,8 @@ def optimize_panels_ga(req: OptimizeRequest):
         max_coverage=req.max_coverage,
         population=req.population,
         generations=req.generations,
-        seed=req.seed
+        seed=req.seed,
+        src=[req.src_x, req.src_y, req.src_z] if None not in (req.src_x, req.src_y, req.src_z) else None,
+        mic=[req.mic_x, req.mic_y, req.mic_z] if None not in (req.mic_x, req.mic_y, req.mic_z) else None,
     )
     return result

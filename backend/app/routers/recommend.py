@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 
 from app.services.ga_service import run_ga
 
@@ -22,6 +22,12 @@ class RecommendRequest(BaseModel):
     wall_a: float = Field(..., ge=0, le=1)
     floor_a: float = Field(..., ge=0, le=1)
     ceil_a: float = Field(..., ge=0, le=1)
+    src_x: Optional[float] = Field(None, ge=0)
+    src_y: Optional[float] = Field(None, ge=0)
+    src_z: Optional[float] = Field(None, ge=0)
+    mic_x: Optional[float] = Field(None, ge=0)
+    mic_y: Optional[float] = Field(None, ge=0)
+    mic_z: Optional[float] = Field(None, ge=0)
     target_coverage: float = Field(0.5, ge=0, le=1)
     exclusions: List[ExclusionRect] = Field(default_factory=list)
 
@@ -170,6 +176,8 @@ async def recommend_panels(req: RecommendRequest):
             population=40,
             generations=30,
             seed=None,  # deterministic per-input inside run_ga()
+            src=[req.src_x, req.src_y, req.src_z] if None not in (req.src_x, req.src_y, req.src_z) else None,
+            mic=[req.mic_x, req.mic_y, req.mic_z] if None not in (req.mic_x, req.mic_y, req.mic_z) else None,
         )
 
         panels_with_dims = [
