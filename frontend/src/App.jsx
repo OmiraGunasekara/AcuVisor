@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import { api } from "./api";
 import {
   Upload,
@@ -17,8 +17,6 @@ import {
   Eraser,
   Wand2,
   RefreshCw,
-  Radio,
-  Mic2,
   Trash2,
 } from "lucide-react";
 
@@ -261,6 +259,10 @@ const MaterialStep = ({
   err,
   onClearAll,
   onNext,
+  autoSurfaceResult,
+  surfaceDetectionBusy,
+  useManualMaterialFlow,
+  setUseManualMaterialFlow,
 }) => {
   const overlayRef = useRef(null);
   const [drag, setDrag] = useState(null);
@@ -351,7 +353,7 @@ const MaterialStep = ({
           <div>
             <h2 className="text-2xl font-bold text-slate-900">Material Suggestion</h2>
             <p className="text-slate-500 text-sm">
-              Current fallback flow: draw wall/floor/ceiling samples, then confirm or override suggested materials.
+              CV tries to detect wall, floor, and ceiling first. You can always switch to manual region selection if the result looks wrong.
             </p>
           </div>
 
@@ -361,39 +363,117 @@ const MaterialStep = ({
             </div>
           )}
 
-          <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide flex items-center gap-2">
-              <PenTool className="w-4 h-4" /> Sampling Tools
-            </h3>
-
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: "wall", label: "Wall", dot: "bg-blue-600" },
-                { id: "floor", label: "Floor", dot: "bg-green-600" },
-                { id: "ceiling", label: "Ceiling", dot: "bg-yellow-500" },
-              ].map((tool) => (
-                <button
-                  key={tool.id}
-                  onClick={() => setMode(tool.id)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border flex items-center gap-2 ${
-                    mode === tool.id
-                      ? "bg-slate-800 text-white border-slate-800 ring-2 ring-offset-1 ring-slate-400"
-                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <div className={`w-2 h-2 rounded-full ${tool.dot}`} />
-                  {tool.label}
-                </button>
-              ))}
-
-              <button
-                onClick={onClearAll}
-                className="col-span-2 text-xs text-red-500 hover:underline flex items-center justify-center gap-1 mt-2"
-              >
-                <Eraser className="w-3 h-3" /> Clear All
-              </button>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+            <div>
+              <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide">
+                Auto Surface Detection
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                The system first tries to detect wall, floor, and ceiling automatically.
+                You can still switch to manual region selection at any time.
+              </p>
             </div>
+
+            {surfaceDetectionBusy ? (
+              <div className="text-sm text-slate-600 flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Detecting room surfaces...
+              </div>
+            ) : autoSurfaceResult ? (
+              <>
+                <div className="grid gap-2 text-xs">
+                  {["wall", "floor", "ceiling"].map((key) => {
+                    const surface = autoSurfaceResult?.surfaces?.[key];
+                    return (
+                      <div
+                        key={key}
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                      >
+                        <div className="font-semibold text-slate-700 uppercase">{key}</div>
+                        {surface ? (
+                          <div className="text-slate-500 mt-1">
+                            area={fmt(surface.mask_area_ratio, 3)} | conf={fmt(surface.confidence, 3)}
+                          </div>
+                        ) : (
+                          <div className="text-red-500 mt-1">Not detected</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {autoSurfaceResult?.fallback_required && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    Detection looks weak or incomplete. Manual selection is recommended.
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setUseManualMaterialFlow(false)}
+                    className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium border ${
+                      !useManualMaterialFlow
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    Use Auto-Detected Regions
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setUseManualMaterialFlow(true)}
+                    className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium border ${
+                      useManualMaterialFlow
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    Use Manual Selection
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-slate-500">No auto-detection result yet.</div>
+            )}
           </div>
+
+          {useManualMaterialFlow && (
+            <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+              <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide flex items-center gap-2">
+                <PenTool className="w-4 h-4" /> Sampling Tools
+              </h3>
+
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: "wall", label: "Wall", dot: "bg-blue-600" },
+                  { id: "floor", label: "Floor", dot: "bg-green-600" },
+                  { id: "ceiling", label: "Ceiling", dot: "bg-yellow-500" },
+                ].map((tool) => (
+                  <button
+                    key={tool.id}
+                    onClick={() => setMode(tool.id)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border flex items-center gap-2 ${
+                      mode === tool.id
+                        ? "bg-slate-800 text-white border-slate-800 ring-2 ring-offset-1 ring-slate-400"
+                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className={`w-2 h-2 rounded-full ${tool.dot}`} />
+                    {tool.label}
+                  </button>
+                ))}
+
+                <button
+                  onClick={onClearAll}
+                  className="col-span-2 text-xs text-red-500 hover:underline flex items-center justify-center gap-1 mt-2"
+                >
+                  <Eraser className="w-3 h-3" /> Clear All
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex-1">
             <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide flex items-center gap-2">
@@ -417,7 +497,7 @@ const MaterialStep = ({
 
             {!hasSuggested ? (
               <div className="text-sm text-slate-500">
-                After drawing Wall/Floor/Ceiling samples, click <b>Auto-Suggest Materials</b>.
+                After surface detection or manual sampling, click <b>Auto-Suggest Materials</b>.
               </div>
             ) : (
               <>
@@ -469,7 +549,7 @@ const MaterialStep = ({
                                     MATERIALS[cand.label]?.label ||
                                     cand.label) +
                                     ` (a=${cand.alpha ?? MATERIALS[cand.label]?.a ?? "?"})` +
-                                    (cand.label === sug ? " *" : "")}
+                                    (cand.label === sug ? " ⭐" : "")}
                                 </option>
                               ))
                             : Object.entries(MATERIALS).map(([k, v]) => (
@@ -510,10 +590,10 @@ const MaterialStep = ({
                   draggable={false}
                 />
                 <div
-                  className={`absolute inset-0 z-10 rounded-lg ${mode ? "cursor-crosshair" : "cursor-default"}`}
-                  onMouseDown={onMouseDown}
-                  onMouseMove={onMouseMove}
-                  onMouseUp={onMouseUp}
+                  className={`absolute inset-0 z-10 rounded-lg ${useManualMaterialFlow && mode ? "cursor-crosshair" : "cursor-default"}`}
+                  onMouseDown={useManualMaterialFlow ? onMouseDown : undefined}
+                  onMouseMove={useManualMaterialFlow ? onMouseMove : undefined}
+                  onMouseUp={useManualMaterialFlow ? onMouseUp : undefined}
                   ref={overlayRef}
                 >
                   <RectOverlay rect={samples.wall} color="#2563eb" label="WALL" />
@@ -530,7 +610,7 @@ const MaterialStep = ({
               <div className="text-slate-500">No Image Loaded</div>
             )}
 
-            {mode && (
+            {useManualMaterialFlow && mode && (
               <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-800/90 text-white px-4 py-2 rounded-full text-sm font-medium backdrop-blur-sm border border-slate-700 shadow-xl animate-bounce">
                 Draw rectangle for {mode.toUpperCase()}
               </div>
@@ -571,10 +651,6 @@ const EditorStep = ({
       ...prev,
       [axis]: clampPointValue(value, max),
     }));
-  };
-
-  const removeExclusion = (idx) => {
-    setExclusions((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const renderPointEditor = (label, point, setPoint, tone, tool) => (
@@ -655,7 +731,7 @@ const EditorStep = ({
             <div>
               <h3 className="font-semibold text-slate-900">Editing Tools</h3>
               <p className="mt-1 text-sm text-slate-500">
-                While placing items, camera drag is locked so clicks land accurately inside the room.
+                Source and listener can be placed either by clicking in 3D or by typing exact coordinates below. Exclusions are added by clicking directly on a wall.
               </p>
             </div>
 
@@ -694,9 +770,7 @@ const EditorStep = ({
 
             {editTool === "exclusion" && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <div className="mb-3 text-sm font-semibold text-amber-900">
-                  Exclusion Size Preview
-                </div>
+                <div className="mb-3 text-sm font-semibold text-amber-900">Exclusion Size Preview</div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs uppercase tracking-wide text-amber-800 block mb-1">
@@ -778,7 +852,7 @@ const EditorStep = ({
                           </div>
                         </div>
                         <button
-                          onClick={() => removeExclusion(idx)}
+                          onClick={() => setExclusions((prev) => prev.filter((_, i) => i !== idx))}
                           className="text-red-600 hover:text-red-700"
                           title="Delete exclusion"
                         >
@@ -903,31 +977,29 @@ const Dashboard = ({
 
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <Mic2 className="w-5 h-5 text-blue-600" /> Audio Positions
+              <Info className="w-5 h-5 text-blue-600" /> Confirmed Materials
             </h3>
 
             <div className="space-y-3 text-sm">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">Source</div>
-                <div className="font-mono text-slate-800">
-                  x={fmt(source.x, 2)}, y={fmt(source.y, 2)}, z={fmt(source.z, 2)}
-                </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-slate-500">Wall</span>
+                <span className="font-semibold text-slate-800">{recommendation?.materials?.wall ?? "-"}</span>
               </div>
-
-              <div>
-                <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">Listener</div>
-                <div className="font-mono text-slate-800">
-                  x={fmt(listener.x, 2)}, y={fmt(listener.y, 2)}, z={fmt(listener.z, 2)}
-                </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-slate-500">Floor</span>
+                <span className="font-semibold text-slate-800">{recommendation?.materials?.floor ?? "-"}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-slate-500">Ceiling</span>
+                <span className="font-semibold text-slate-800">{recommendation?.materials?.ceiling ?? "-"}</span>
               </div>
             </div>
           </div>
 
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <Volume2 className="w-5 h-5 text-purple-600" />
-              <h3 className="font-bold text-slate-900">Auralization</h3>
-            </div>
+            <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <Volume2 className="w-5 h-5 text-purple-600" /> Auralization
+            </h3>
 
             {!audio ? (
               <div className="text-center py-4">
@@ -997,6 +1069,11 @@ export default function App() {
   const [mode, setMode] = useState(null);
   const [samples, setSamples] = useState({ wall: null, floor: null, ceiling: null });
 
+  const [autoSurfaceResult, setAutoSurfaceResult] = useState(null);
+  const [surfaceDetectionTried, setSurfaceDetectionTried] = useState(false);
+  const [surfaceDetectionBusy, setSurfaceDetectionBusy] = useState(false);
+  const [useManualMaterialFlow, setUseManualMaterialFlow] = useState(false);
+
   const [override, setOverride] = useState({
     wall: "painted_plaster",
     floor: "wood",
@@ -1025,14 +1102,18 @@ export default function App() {
   const floor_a = useMemo(() => MATERIALS[override.floor]?.a || 0.2, [override.floor]);
   const ceil_a = useMemo(() => MATERIALS[override.ceiling]?.a || 0.07, [override.ceiling]);
 
-  const hasDims = Number(L) > 0 && Number(W) > 0 && Number(H) > 0;
-  const hasImage = !!imageFile;
-
   const onPickImage = (file) => {
     setImageFile(file);
     setImageURL(URL.createObjectURL(file));
 
+    setMode(null);
     setSamples({ wall: null, floor: null, ceiling: null });
+
+    setAutoSurfaceResult(null);
+    setSurfaceDetectionTried(false);
+    setSurfaceDetectionBusy(false);
+    setUseManualMaterialFlow(false);
+
     setOverride({ wall: "painted_plaster", floor: "wood", ceiling: "painted_plaster" });
     setSuggested({ wall: null, floor: null, ceiling: null });
     setHasSuggested(false);
@@ -1053,10 +1134,68 @@ export default function App() {
     setSuggested({ wall: null, floor: null, ceiling: null });
     setHasSuggested(false);
     setMaterialCandidates({ wall: null, floor: null, ceiling: null });
+    setUseManualMaterialFlow(true);
     setErr("");
   };
 
-  const callSuggestOne = async (surface) => {
+  const surfaceBoxToRect = (surface) => {
+    if (!surface?.bbox) return null;
+    return {
+      x1: Number(surface.bbox.x1),
+      y1: Number(surface.bbox.y1),
+      x2: Number(surface.bbox.x2),
+      y2: Number(surface.bbox.y2),
+    };
+  };
+
+  const runSurfaceDetection = async () => {
+    if (!imageFile) return;
+
+    setErr("");
+    setSurfaceDetectionBusy(true);
+
+    try {
+      const fd = new FormData();
+      fd.append("image", imageFile);
+
+      const result = await api.segmentSurfaces(fd);
+
+      setAutoSurfaceResult(result);
+      setSurfaceDetectionTried(true);
+
+      const wallRect = surfaceBoxToRect(result?.surfaces?.wall);
+      const floorRect = surfaceBoxToRect(result?.surfaces?.floor);
+      const ceilingRect = surfaceBoxToRect(result?.surfaces?.ceiling);
+
+      if (wallRect && floorRect && ceilingRect) {
+        setSamples({
+          wall: wallRect,
+          floor: floorRect,
+          ceiling: ceilingRect,
+        });
+      }
+
+      if (result?.fallback_required) {
+        setUseManualMaterialFlow(true);
+      }
+    } catch (e) {
+      console.error(e);
+      setErr(e.message || String(e));
+      setAutoSurfaceResult(null);
+      setSurfaceDetectionTried(true);
+      setUseManualMaterialFlow(true);
+    } finally {
+      setSurfaceDetectionBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (step === 2 && imageFile && !surfaceDetectionTried && !surfaceDetectionBusy) {
+      runSurfaceDetection();
+    }
+  }, [step, imageFile, surfaceDetectionTried, surfaceDetectionBusy]);
+
+  const suggestFromManualClick = async (surface) => {
     const rect = samples[surface];
     if (!rect) throw new Error(`Draw a ${surface} sample rectangle first.`);
 
@@ -1073,14 +1212,36 @@ export default function App() {
     return await api.suggestMaterial(fd);
   };
 
+  const suggestFromAutoBbox = async (surface) => {
+    const rect = samples[surface];
+    if (!rect) throw new Error(`No detected ${surface} region available.`);
+
+    const fd = new FormData();
+    fd.append("image", imageFile);
+    fd.append("surface", surface);
+    fd.append("x1", String(rect.x1));
+    fd.append("y1", String(rect.y1));
+    fd.append("x2", String(rect.x2));
+    fd.append("y2", String(rect.y2));
+
+    return await api.suggestMaterialFromBbox(fd);
+  };
+
   const onSuggestMaterials = async () => {
     setErr("");
     setBusy((b) => ({ ...b, suggest: true }));
 
     try {
-      const wallRes = await callSuggestOne("wall");
-      const floorRes = await callSuggestOne("floor");
-      const ceilRes = await callSuggestOne("ceiling");
+      const runForSurface = async (surface) => {
+        if (useManualMaterialFlow) {
+          return await suggestFromManualClick(surface);
+        }
+        return await suggestFromAutoBbox(surface);
+      };
+
+      const wallRes = await runForSurface("wall");
+      const floorRes = await runForSurface("floor");
+      const ceilRes = await runForSurface("ceiling");
 
       const extractLabel = (res) =>
         res?.suggested_label ?? res?.predicted_label ?? res?.label ?? null;
@@ -1111,6 +1272,29 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    const canAutoSuggest =
+      step === 2 &&
+      !useManualMaterialFlow &&
+      samples.wall &&
+      samples.floor &&
+      samples.ceiling &&
+      !busy.suggest &&
+      !hasSuggested;
+
+    if (!canAutoSuggest) return;
+
+    onSuggestMaterials();
+  }, [
+    step,
+    useManualMaterialFlow,
+    samples.wall,
+    samples.floor,
+    samples.ceiling,
+    busy.suggest,
+    hasSuggested,
+  ]);
+
   const onRecommendPanels = async () => {
     setErr("");
     setBusy((b) => ({ ...b, rec: true }));
@@ -1134,7 +1318,15 @@ export default function App() {
       };
 
       const res = await api.recommendPanels(payload);
-      setRecommendation(res);
+      const enriched = {
+        ...res,
+        materials: {
+          wall: MATERIALS[override.wall]?.label ?? override.wall,
+          floor: MATERIALS[override.floor]?.label ?? override.floor,
+          ceiling: MATERIALS[override.ceiling]?.label ?? override.ceiling,
+        },
+      };
+      setRecommendation(enriched);
 
       try {
         const rtReq = {
@@ -1218,6 +1410,12 @@ export default function App() {
     setL(5.2);
     setW(4.1);
     setH(2.8);
+
+    setAutoSurfaceResult(null);
+    setSurfaceDetectionTried(false);
+    setSurfaceDetectionBusy(false);
+    setUseManualMaterialFlow(false);
+    setMode(null);
   };
 
   return (
@@ -1254,10 +1452,14 @@ export default function App() {
             hasSuggested={hasSuggested}
             materialCandidates={materialCandidates}
             onSuggestMaterials={onSuggestMaterials}
-            busy={busy}
+            busy={{ ...busy, surfaceDetection: surfaceDetectionBusy }}
             err={err}
             onClearAll={onClearMaterialSamples}
             onNext={() => setStep(3)}
+            autoSurfaceResult={autoSurfaceResult}
+            surfaceDetectionBusy={surfaceDetectionBusy}
+            useManualMaterialFlow={useManualMaterialFlow}
+            setUseManualMaterialFlow={setUseManualMaterialFlow}
           />
         )}
 
@@ -1304,5 +1506,4 @@ export default function App() {
     </div>
   );
 }
-
 
