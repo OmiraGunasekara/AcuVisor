@@ -38,4 +38,5 @@ export const api = {
   recommendPanels: (payload) => postJson("/recommend-panels", payload),
   predictRt60: (payload) => postJson("/predict-rt60", payload),
   generateAudio: (payload) => postJson("/generate-audio", payload),
+  generateAudioUpload: (formData) => postForm("/generate-audio-upload", formData),
 };

@@ -916,6 +916,10 @@ const Dashboard = ({
   rt60,
   audio,
   busy,
+  audioInputMode,
+  onSelectAudioInputMode,
+  uploadedAudioFile,
+  onPickUploadedAudio,
   onGenerateAudio,
   onReset,
   L,
@@ -1001,29 +1005,96 @@ const Dashboard = ({
               <Volume2 className="w-5 h-5 text-purple-600" /> Auralization
             </h3>
 
-            {!audio ? (
-              <div className="text-center py-4">
-                <p className="text-sm text-slate-500 mb-4">
-                  Generate a before/after simulation using the predicted room response.
-                </p>
-                <button
-                  onClick={onGenerateAudio}
-                  disabled={busy.audio}
-                  className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {busy.audio ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                  Generate Audio Simulation
-                </button>
+            <div className="space-y-4">
+              <p className="text-sm text-slate-500">
+                Choose a built-in sample or upload your own dry audio, then generate an untreated-vs-treated preview using the predicted room response.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  {
+                    id: "sample",
+                    title: "Use Built-In Sample",
+                    body: "Uses the built-in speech sample plus the clap test.",
+                  },
+                  {
+                    id: "upload",
+                    title: "Upload Dry Audio",
+                    body: "Bring a clean voice or music file and we will simulate this room on it.",
+                  },
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => onSelectAudioInputMode(option.id)}
+                    className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                      audioInputMode === option.id
+                        ? "border-purple-500 bg-purple-50 text-purple-900"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="text-sm font-semibold">{option.title}</div>
+                    <div className="mt-1 text-xs text-slate-500">{option.body}</div>
+                  </button>
+                ))}
               </div>
-            ) : (
-              <div className="space-y-4">
-                <AudioPlayer type="Clap Test" label="Before" src={`http://127.0.0.1:8000${audio.clap_before_audio}`} />
-                <AudioPlayer type="Clap Test" label="After" src={`http://127.0.0.1:8000${audio.clap_after_audio}`} />
-                <div className="border-t border-slate-100 my-2" />
-                <AudioPlayer type="Speech" label="Before" src={`http://127.0.0.1:8000${audio.speech_before_audio}`} />
-                <AudioPlayer type="Speech" label="After" src={`http://127.0.0.1:8000${audio.speech_after_audio}`} />
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Upload mode only accepts a dry recording.
+                <div className="mt-1 text-amber-800/90">
+                  Use a clean voice or music file. Do not upload audio that was already recorded inside the untreated room.
+                </div>
               </div>
-            )}
+
+              {audioInputMode === "upload" && (
+                <label className="block rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center cursor-pointer hover:border-slate-400 hover:bg-slate-100 transition-colors">
+                  <input
+                    type="file"
+                    accept=".wav,.flac,.ogg,.oga,audio/wav,audio/flac,audio/ogg"
+                    onChange={(e) => onPickUploadedAudio(e.target.files?.[0] ?? null)}
+                    className="hidden"
+                  />
+                  {uploadedAudioFile ? (
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">{uploadedAudioFile.name}</div>
+                      <div className="mt-1 text-xs text-slate-500">Dry WAV, FLAC, or OGG file selected.</div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Choose dry audio file</div>
+                      <div className="mt-1 text-xs text-slate-500">Supported formats: WAV, FLAC, OGG.</div>
+                    </div>
+                  )}
+                </label>
+              )}
+
+              <button
+                onClick={onGenerateAudio}
+                disabled={busy.audio}
+                className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {busy.audio ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                {audioInputMode === "upload" ? "Generate Dry Audio Preview" : "Generate Audio Simulation"}
+              </button>
+
+              {audio && (
+                <div className="space-y-4 pt-2">
+                  <AudioPlayer type="Clap Test" label="Before" src={`http://127.0.0.1:8000${audio.clap_before_audio}`} />
+                  <AudioPlayer type="Clap Test" label="After" src={`http://127.0.0.1:8000${audio.clap_after_audio}`} />
+                  <div className="border-t border-slate-100 my-2" />
+                  <AudioPlayer
+                    type={audio.speech_label || "Speech Sample"}
+                    label="Before"
+                    src={`http://127.0.0.1:8000${audio.speech_before_audio}`}
+                  />
+                  <AudioPlayer
+                    type={audio.speech_label || "Speech Sample"}
+                    label="After"
+                    src={`http://127.0.0.1:8000${audio.speech_after_audio}`}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1097,10 +1168,24 @@ export default function App() {
   const [recommendation, setRecommendation] = useState(null);
   const [rt60, setRt60] = useState(null);
   const [audio, setAudio] = useState(null);
+  const [audioInputMode, setAudioInputMode] = useState("sample");
+  const [uploadedAudioFile, setUploadedAudioFile] = useState(null);
 
   const wall_a = useMemo(() => MATERIALS[override.wall]?.a || 0.07, [override.wall]);
   const floor_a = useMemo(() => MATERIALS[override.floor]?.a || 0.2, [override.floor]);
   const ceil_a = useMemo(() => MATERIALS[override.ceiling]?.a || 0.07, [override.ceiling]);
+
+  const onSelectAudioInputMode = (nextMode) => {
+    setAudioInputMode(nextMode);
+    setAudio(null);
+    setErr("");
+  };
+
+  const onPickUploadedAudio = (file) => {
+    setUploadedAudioFile(file);
+    setAudio(null);
+    setErr("");
+  };
 
   const onPickImage = (file) => {
     setImageFile(file);
@@ -1126,6 +1211,8 @@ export default function App() {
     setRecommendation(null);
     setRt60(null);
     setAudio(null);
+    setAudioInputMode("sample");
+    setUploadedAudioFile(null);
     setErr("");
   };
 
@@ -1327,6 +1414,7 @@ export default function App() {
         },
       };
       setRecommendation(enriched);
+      setAudio(null);
 
       try {
         const rtReq = {
@@ -1378,7 +1466,20 @@ export default function App() {
         mic_z: Number(listener.z),
       };
 
-      const res = await api.generateAudio(payload);
+      let res;
+      if (audioInputMode === "upload") {
+        if (!uploadedAudioFile) {
+          throw new Error("Upload a dry WAV, FLAC, or OGG file first.");
+        }
+
+        const fd = new FormData();
+        fd.append("payload", JSON.stringify(payload));
+        fd.append("audio_file", uploadedAudioFile);
+        res = await api.generateAudioUpload(fd);
+      } else {
+        res = await api.generateAudio(payload);
+      }
+
       setAudio(res);
     } catch (e) {
       setErr(e.message || String(e));
@@ -1405,6 +1506,8 @@ export default function App() {
     setRecommendation(null);
     setRt60(null);
     setAudio(null);
+    setAudioInputMode("sample");
+    setUploadedAudioFile(null);
     setErr("");
 
     setL(5.2);
@@ -1486,6 +1589,10 @@ export default function App() {
             rt60={rt60}
             audio={audio}
             busy={busy}
+            audioInputMode={audioInputMode}
+            onSelectAudioInputMode={onSelectAudioInputMode}
+            uploadedAudioFile={uploadedAudioFile}
+            onPickUploadedAudio={onPickUploadedAudio}
             onGenerateAudio={onGenerateAudio}
             onReset={handleReset}
             source={source}
