@@ -71,6 +71,35 @@ function resolveWallRect(item, L, W, H) {
   };
 }
 
+function wallLabelFor(wall) {
+  switch (wall) {
+    case "north":
+      return "North Wall";
+    case "south":
+      return "South Wall";
+    case "east":
+      return "East Wall";
+    case "west":
+      return "West Wall";
+    default:
+      return "Wall";
+  }
+}
+
+function describePanel(panel, index, L, W, H) {
+  const rect = resolveWallRect(panel, L, W, H);
+  if (!rect) return null;
+
+  return {
+    index,
+    wall: rect.wall,
+    wallLabel: wallLabelFor(rect.wall),
+    width: rect.width,
+    height: rect.height,
+    area: rect.width * rect.height,
+  };
+}
+
 function buildWallItemMesh(item, L, W, H, inset, thickness) {
   const rect = resolveWallRect(item, L, W, H);
   if (!rect) return null;
@@ -266,12 +295,20 @@ function RoomScene({
   showLabels = true,
   onPlaceListener,
   onAddExclusion,
+  selectedPanelIndex = null,
+  onSelectPanel,
 }) {
   const controlsRef = useRef(null);
   const [hoveredExclusion, setHoveredExclusion] = useState(null);
 
   const panelMeshes = useMemo(
-    () => panels.map((panel) => buildWallItemMesh(panel, L, W, H, 0.03, 0.1)).filter(Boolean),
+    () =>
+      panels
+        .map((panel, index) => {
+          const mesh = buildWallItemMesh(panel, L, W, H, 0.03, 0.1);
+          return mesh ? { ...mesh, index } : null;
+        })
+        .filter(Boolean),
     [panels, L, W, H]
   );
 
@@ -485,17 +522,24 @@ function RoomScene({
             metalness={0.02}
           />
         ))}
-        {panelMeshes.map((mesh, index) => (
-          <SurfaceBox
-            key={`panel-${index}`}
-            position={mesh.position}
-            size={mesh.size}
-            color="#3b82f6"
-            edgeColor="#1d4ed8"
-            opacity={0.9}
-            metalness={0.1}
-          />
-        ))}
+        {panelMeshes.map((mesh) => {
+          const isSelected = selectedPanelIndex === mesh.index;
+          return (
+            <SurfaceBox
+              key={`panel-${mesh.index}`}
+              position={mesh.position}
+              size={mesh.size}
+              color={isSelected ? "#1d4ed8" : "#3b82f6"}
+              edgeColor={isSelected ? "#f8fafc" : "#1d4ed8"}
+              opacity={isSelected ? 1 : 0.9}
+              metalness={0.1}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectPanel?.(mesh.index);
+              }}
+            />
+          );
+        })}
         {sourcePosition && (
           <Marker position={sourcePosition} color="#10b981" label={showLabels ? "Source" : null} />
         )}
@@ -552,6 +596,7 @@ export default function PanelView({
   const sourceClearanceZones = recommendation?.source_clearance_zones ?? [];
   const [viewPreset, setViewPreset] = useState(interactive ? "top" : "iso");
   const [showLabels, setShowLabels] = useState(true);
+  const [selectedPanelIndex, setSelectedPanelIndex] = useState(null);
 
   useEffect(() => {
     if (!interactive) return;
@@ -565,6 +610,22 @@ export default function PanelView({
       setViewPreset("north");
     }
   }, [interactive, editTool, viewPreset]);
+
+  const panelDetails = useMemo(
+    () =>
+      panels
+        .map((panel, index) => describePanel(panel, index, Number(L), Number(W), Number(H)))
+        .filter(Boolean),
+    [panels, L, W, H]
+  );
+  const selectedPanel =
+    selectedPanelIndex != null ? panelDetails.find((panel) => panel.index === selectedPanelIndex) ?? null : null;
+
+  useEffect(() => {
+    if (!panelDetails.some((panel) => panel.index === selectedPanelIndex)) {
+      setSelectedPanelIndex(null);
+    }
+  }, [panelDetails, selectedPanelIndex]);
 
   const cameraDistance = Math.max(L, W) * 1.45;
   const cameraHeight = Math.max(H * 1.25, 3.2);
@@ -630,6 +691,11 @@ export default function PanelView({
       {sourceClearanceZones.length > 0 && (
         <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Amber source-clearance zones are reserved automatically when the source sits very close to a wall, so panels are not placed unrealistically around it.
+        </div>
+      )}
+      {panelDetails.length > 0 && (
+        <div className="mb-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          Click any blue recommended panel in the room view to see its size and wall placement.
         </div>
       )}
       <div className="mb-3 text-sm text-slate-600">{helperText}</div>
@@ -705,10 +771,37 @@ export default function PanelView({
               onPlaceSource={onPlaceSource}
               onPlaceListener={onPlaceListener}
               onAddExclusion={onAddExclusion}
+              selectedPanelIndex={selectedPanelIndex}
+              onSelectPanel={setSelectedPanelIndex}
             />
           </Canvas>
         </div>
       </div>
+
+      {selectedPanel && (
+        <div className="mt-4 rounded-2xl border border-blue-200 bg-white p-4 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Selected Panel</div>
+          <div className="mt-2 text-lg font-bold text-slate-900">Panel {selectedPanel.index + 1}</div>
+          <div className="mt-3 grid gap-3 text-sm text-slate-700 sm:grid-cols-4">
+            <div>
+              <div className="text-xs uppercase tracking-wide text-slate-500">Wall</div>
+              <div className="mt-1 font-semibold text-slate-900">{selectedPanel.wallLabel}</div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide text-slate-500">Width</div>
+              <div className="mt-1 font-semibold text-slate-900">{fmt(selectedPanel.width)}m</div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide text-slate-500">Height</div>
+              <div className="mt-1 font-semibold text-slate-900">{fmt(selectedPanel.height)}m</div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide text-slate-500">Area</div>
+              <div className="mt-1 font-semibold text-slate-900">{fmt(selectedPanel.area)}m2</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
