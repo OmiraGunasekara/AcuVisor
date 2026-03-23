@@ -1,4 +1,5 @@
 import io
+import math
 import os
 import shutil
 import uuid
@@ -350,7 +351,7 @@ def generate_audio(
         L, W, H, wall_a, floor_a, ceil_a,
         src_pos=src_pos,
         mic_pos=mic_pos,
-        max_order=35,
+        max_order=30,
     )
     rir_before = compute_rir(room_before)
     rt60_before = estimate_rt60_t30(rir_before)
@@ -365,7 +366,7 @@ def generate_audio(
     rir_after = compute_rir(room_after)
     rt60_after = estimate_rt60_t30(rir_after)
 
-    if (rt60_before == rt60_before) and (rt60_after == rt60_after) and (rt60_after > rt60_before):
+    if math.isfinite(rt60_before) and math.isfinite(rt60_after) and (rt60_after > rt60_before):
         rt60_flag = "rt60_after_gt_before_check_decay_fit"
     else:
         rt60_flag = "ok"
@@ -403,7 +404,7 @@ def generate_audio(
         "rt60_before": rt60_before,
         "rt60_after": rt60_after,
         "rt60_delta": (rt60_before - rt60_after)
-        if (rt60_before == rt60_before and rt60_after == rt60_after)
+        if (math.isfinite(rt60_before) and math.isfinite(rt60_after))
         else None,
         "effective_wall_a_before": float(wall_a),
         "effective_wall_a_after": float(wall_a_after),

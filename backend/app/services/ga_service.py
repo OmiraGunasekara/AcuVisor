@@ -1,4 +1,4 @@
-"""
+﻿"""
 ga_service.py - AcuVisor panel placement optimiser.
 
 Changes from previous version
@@ -341,8 +341,8 @@ def _fitness(chrom: Chromosome,
              L: float, W: float, H: float,
              wall_a: float, floor_a: float, ceil_a: float,
              max_coverage: float, exclusions: List[Dict],
-             src: List[float] = None,
-             mic: List[float] = None) -> float:
+             src: Optional[List[float]] = None,
+             mic: Optional[List[float]] = None) -> float:
 
     panels, cov = decode(chrom, L, W, H, exclusions)
 
@@ -499,8 +499,8 @@ def run_ga(
     population: int = POPULATION,
     generations: int = GENERATIONS,
     seed: int = None,
-    src: List[float] = None,
-    mic: List[float] = None,
+    src: Optional[List[float]] = None,
+    mic: Optional[List[float]] = None,
 ) -> Dict:
     """
     Optimise acoustic panel placement using zone-based grid cluster chromosomes.

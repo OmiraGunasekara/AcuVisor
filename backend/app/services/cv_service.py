@@ -279,8 +279,7 @@ def suggest_material_from_crop(crop: Image.Image, surface: str) -> Dict:
         for material, scores in material_scores.items()
     }
 
-    adjusted_scores = _apply_color_penalties(material_max_scores, color_info)
-    sorted_materials = sorted(adjusted_scores.items(), key=lambda x: x[1], reverse=True)
+    sorted_materials = sorted(material_max_scores.items(), key=lambda x: x[1], reverse=True)
 
     candidates = _normalize_candidates(sorted_materials, top_k=5)
 
@@ -297,5 +296,5 @@ def suggest_material_from_crop(crop: Image.Image, surface: str) -> Dict:
         "suggested_label": best_label,
         "confidence": float(best_conf),
         "candidates": candidates,
-        "note": f"Hybrid CLIP + color analysis (brightness: {color_info['brightness']:.2f})",
+        "note": f"CLIP material suggestion with brightness fallback metadata ({color_info['brightness']:.2f})",
     }
