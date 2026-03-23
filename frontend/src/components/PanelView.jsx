@@ -135,6 +135,28 @@ function toMarkerPosition(point) {
   return [Number(point.x ?? 0), Number(point.z ?? 0), Number(point.y ?? 0)];
 }
 
+function buildFloorPlacement(roomPoint, currentPoint, H) {
+  return {
+    x: roundCoord(roomPoint.x),
+    y: roundCoord(roomPoint.z),
+    z: roundCoord(clamp(Number(currentPoint?.z ?? Math.min(1.5, H - 0.05)), 0.05, Math.max(H - 0.05, 0.05))),
+  };
+}
+
+function buildWallPlacement(wall, roomPoint, currentPoint, L, W, H) {
+  const maxX = Math.max(Number(L) - 0.05, 0.05);
+  const maxY = Math.max(Number(W) - 0.05, 0.05);
+  const maxZ = Math.max(Number(H) - 0.05, 0.05);
+  const baseX = clamp(Number(currentPoint?.x ?? Number(L) / 2), 0.05, maxX);
+  const baseY = clamp(Number(currentPoint?.y ?? Number(W) / 2), 0.05, maxY);
+
+  return {
+    x: roundCoord(clamp(wall === "north" || wall === "south" ? roomPoint.x : baseX, 0.05, maxX)),
+    y: roundCoord(clamp(wall === "east" || wall === "west" ? roomPoint.z : baseY, 0.05, maxY)),
+    z: roundCoord(clamp(roomPoint.y, 0.05, maxZ)),
+  };
+}
+
 function SurfaceBox({
   position,
   size,
@@ -340,19 +362,11 @@ function RoomScene({
     if (!roomPoint) return;
 
     if (editTool === "source" && onPlaceSource) {
-      onPlaceSource({
-        x: roundCoord(roomPoint.x),
-        y: roundCoord(roomPoint.z),
-        z: roundCoord(clamp(Number(source?.z ?? Math.min(1.5, H - 0.05)), 0.05, H - 0.05)),
-      });
+      onPlaceSource(buildFloorPlacement(roomPoint, source, H));
     }
 
     if (editTool === "listener" && onPlaceListener) {
-      onPlaceListener({
-        x: roundCoord(roomPoint.x),
-        y: roundCoord(roomPoint.z),
-        z: roundCoord(clamp(Number(listener?.z ?? Math.min(1.5, H - 0.05)), 0.05, H - 0.05)),
-      });
+      onPlaceListener(buildFloorPlacement(roomPoint, listener, H));
     }
   };
 
@@ -377,11 +391,23 @@ function RoomScene({
   };
 
   const handleWallClick = (wall) => (e) => {
-    if (!interactive || editTool !== "exclusion" || !onAddExclusion) return;
+    if (!interactive) return;
     e.stopPropagation();
 
     const roomPoint = toRoomLocalPoint(e.point, L, W, H);
     if (!roomPoint) return;
+
+    if (editTool === "source" && onPlaceSource) {
+      onPlaceSource(buildWallPlacement(wall, roomPoint, source, L, W, H));
+      return;
+    }
+
+    if (editTool === "listener" && onPlaceListener) {
+      onPlaceListener(buildWallPlacement(wall, roomPoint, listener, L, W, H));
+      return;
+    }
+
+    if (editTool !== "exclusion" || !onAddExclusion) return;
 
     const rect = wallClickToExclusion(
       wall,
@@ -400,8 +426,9 @@ function RoomScene({
   };
 
   const wallLabelHeight = clamp(H * 0.58, 0.8, Math.max(H - 0.2, 0.8));
-  const placementLocked = interactive && editTool !== "none";
-  const allowIsoContextOrbit = interactive && editTool === "exclusion" && viewPreset === "iso";
+  const pointPlacementMode = interactive && (editTool === "source" || editTool === "listener");
+  const exclusionPlacementMode = interactive && editTool === "exclusion";
+  const allowContextOrbit = pointPlacementMode || (exclusionPlacementMode && viewPreset === "iso");
 
   return (
     <>
@@ -555,11 +582,11 @@ function RoomScene({
       <OrbitControls
         ref={controlsRef}
         makeDefault
-        enablePan={!placementLocked}
+        enablePan={!interactive || editTool === "none"}
         enableZoom
-        enableRotate={!placementLocked || allowIsoContextOrbit}
+        enableRotate={!exclusionPlacementMode || allowContextOrbit}
         mouseButtons={
-          allowIsoContextOrbit
+          allowContextOrbit
             ? { LEFT: -1, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.ROTATE }
             : undefined
         }
@@ -601,11 +628,6 @@ export default function PanelView({
   useEffect(() => {
     if (!interactive) return;
 
-    if (editTool === "source" || editTool === "listener") {
-      setViewPreset("top");
-      return;
-    }
-
     if (editTool === "exclusion" && viewPreset === "top") {
       setViewPreset("north");
     }
@@ -633,19 +655,15 @@ export default function PanelView({
 
   const helperText =
     editTool === "source"
-      ? "Top view is selected for accurate source placement. Click the floor to set x/y and fine-tune height from the inputs."
+      ? "Click the floor to set source x/y. Click a side wall to set height plus the remaining horizontal axis. Right-drag rotates the room while placing."
       : editTool === "listener"
-      ? "Top view is selected for accurate listener placement. Click the floor to set x/y and fine-tune height from the inputs."
+      ? "Click the floor to set listener x/y. Click a side wall to set height plus the remaining horizontal axis. Right-drag rotates the room while placing."
       : editTool === "exclusion"
       ? "Choose a wall view, hover to preview the rectangle, then click to place the exclusion on that wall. In ISO view, right-drag orbits without changing left-click placement."
       : "Orbit, zoom, inspect the room, and use the wall labels to understand the directions.";
 
   const disabledPresets = useMemo(() => {
     if (!interactive) return new Set();
-
-    if (editTool === "source" || editTool === "listener") {
-      return new Set(["iso", "north", "south", "east", "west"]);
-    }
 
     if (editTool === "exclusion") {
       return new Set(["top"]);
@@ -743,7 +761,12 @@ export default function PanelView({
           <Canvas
             shadows={false}
             onContextMenu={(event) => {
-              if (interactive && editTool === "exclusion" && viewPreset === "iso") {
+              if (
+                interactive &&
+                (editTool === "source" ||
+                  editTool === "listener" ||
+                  (editTool === "exclusion" && viewPreset === "iso"))
+              ) {
                 event.preventDefault();
               }
             }}
@@ -828,3 +851,4 @@ export default function PanelView({
     </div>
   );
 }
+

@@ -715,7 +715,7 @@ const EditorStep = ({
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-slate-900">{label}</div>
-          <div className="text-xs text-slate-500">x = room length, y = room width, z = height</div>
+          <div className="text-xs text-slate-500">x = room length, y = room width, z = height. Use floor clicks for x/y and side-wall clicks for height.</div>
         </div>
         <button
           type="button"
@@ -780,7 +780,7 @@ const EditorStep = ({
           <div>
             <h2 className="text-2xl font-bold text-slate-900">3D Room Editor</h2>
             <p className="text-slate-500 text-sm">
-              The room box uses your L x W x H dimensions directly. Use top view for source/listener placement and wall views for exclusions.
+              The room box uses your L x W x H dimensions directly. Place source/listener from the floor and side walls, and use right-drag to orbit while editing.
             </p>
           </div>
 
@@ -788,7 +788,7 @@ const EditorStep = ({
             <div>
               <h3 className="font-semibold text-slate-900">Editing Tools</h3>
               <p className="mt-1 text-sm text-slate-500">
-                Source and listener can be placed either by clicking in 3D or by typing exact coordinates below. Exclusions are added by clicking directly on a wall.
+                Floor clicks set source/listener x/y, side-wall clicks set height plus the remaining axis, and the number inputs still work for exact values. Exclusions are added by clicking directly on a wall.
               </p>
             </div>
 
@@ -1672,6 +1672,7 @@ export default function App() {
     </div>
   );
 }
+
 
 
 
