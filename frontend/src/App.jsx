@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { jsPDF } from "jspdf";
-import { Link, NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { api } from "./api";
 import {
   Upload,
@@ -1418,7 +1418,14 @@ const Dashboard = ({
 
 // --- MAIN APP ---
 export default function App() {
-  const [step, setStep] = useState(0);
+  const location = useLocation();
+  const [step, setStep] = useState(() => new URLSearchParams(window.location.search).get("start") === "true" ? 1 : 0);
+
+  useEffect(() => {
+    if (location.pathname === "/" && new URLSearchParams(location.search).get("start") === "true") {
+      setStep(1);
+    }
+  }, [location.pathname, location.search]);
 
   const [L, setL] = useState(5.2);
   const [W, setW] = useState(4.1);
