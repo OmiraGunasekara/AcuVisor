@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { jsPDF } from "jspdf";
+import { Link, NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { api } from "./api";
 import {
   Upload,
@@ -23,6 +24,8 @@ import {
 } from "lucide-react";
 
 import PanelView from "./components/PanelView";
+import AboutPage from "./pages/AboutPage";
+import HowItWorksPage from "./pages/HowItWorksPage";
 
 // --- CONSTANTS ---
 const MATERIALS = {
@@ -239,25 +242,26 @@ function buildPdfReport({
 }
 
 // --- COMPONENTS ---
+function navLinkClassName({ isActive }) {
+  return `text-sm transition-colors ${isActive ? "text-white" : "text-slate-400 hover:text-white"}`;
+}
+
 const Header = () => (
-  <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-50">
-    <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-      <div
-        onClick={() => window.location.reload()}
-        className="flex items-center gap-2 cursor-pointer select-none"
-      >
-        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-          <Layers className="text-white w-5 h-5" />
+  <header className="sticky top-0 z-50 border-b border-slate-800 bg-slate-900 text-white">
+    <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
+      <a href="/" className="flex items-center gap-2 select-none">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
+          <Layers className="h-5 w-5 text-white" />
         </div>
         <span className="text-xl font-bold tracking-tight">AcuVisor</span>
-      </div>
-      <nav className="hidden md:flex gap-6 text-sm text-slate-400">
-        <a href="#" className="hover:text-white transition-colors">
-          How it Works
-        </a>
-        <a href="#" className="hover:text-white transition-colors">
+      </a>
+      <nav className="hidden md:flex gap-6 text-sm">
+        <NavLink to="/how-it-works" className={navLinkClassName}>
+          How It Works
+        </NavLink>
+        <NavLink to="/about" className={navLinkClassName}>
           About
-        </a>
+        </NavLink>
       </nav>
     </div>
   </header>
@@ -1812,84 +1816,96 @@ export default function App() {
       <Header />
 
       <main>
-        {step > 0 && <StepProgress step={step} />}
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <>
+                {step > 0 && <StepProgress step={step} />}
 
-        {step === 0 && <Hero onStart={() => setStep(1)} />}
+                {step === 0 && <Hero onStart={() => setStep(1)} />}
 
-        {step === 1 && (
-          <InputStep
-            L={L}
-            setL={setL}
-            W={W}
-            setW={setW}
-            H={H}
-            setH={setH}
-            imageFile={imageFile}
-            onPickImage={onPickImage}
-            onNext={() => setStep(2)}
+                {step === 1 && (
+                  <InputStep
+                    L={L}
+                    setL={setL}
+                    W={W}
+                    setW={setW}
+                    H={H}
+                    setH={setH}
+                    imageFile={imageFile}
+                    onPickImage={onPickImage}
+                    onNext={() => setStep(2)}
+                  />
+                )}
+
+                {step === 2 && (
+                  <MaterialStep
+                    imageURL={imageURL}
+                    mode={mode}
+                    setMode={setMode}
+                    samples={samples}
+                    setSamples={setSamples}
+                    override={override}
+                    setOverride={setOverride}
+                    suggested={suggested}
+                    hasSuggested={hasSuggested}
+                    materialCandidates={materialCandidates}
+                    onSuggestMaterials={onSuggestMaterials}
+                    busy={{ ...busy, surfaceDetection: surfaceDetectionBusy }}
+                    err={err}
+                    onClearAll={onClearMaterialSamples}
+                    onNext={() => setStep(3)}
+                    autoSurfaceResult={autoSurfaceResult}
+                    surfaceDetectionBusy={surfaceDetectionBusy}
+                    useManualMaterialFlow={useManualMaterialFlow}
+                    setUseManualMaterialFlow={setUseManualMaterialFlow}
+                  />
+                )}
+
+                {step === 3 && (
+                  <EditorStep
+                    L={L}
+                    W={W}
+                    H={H}
+                    source={source}
+                    setSource={setSource}
+                    listener={listener}
+                    setListener={setListener}
+                    exclusions={exclusions}
+                    setExclusions={setExclusions}
+                    busy={busy}
+                    onBack={() => setStep(2)}
+                    onNext={onRecommendPanels}
+                  />
+                )}
+
+                {step === 4 && (
+                  <Dashboard
+                    recommendation={recommendation}
+                    rt60={rt60}
+                    audio={audio}
+                    busy={busy}
+                    audioInputMode={audioInputMode}
+                    onSelectAudioInputMode={onSelectAudioInputMode}
+                    uploadedAudioFile={uploadedAudioFile}
+                    onPickUploadedAudio={onPickUploadedAudio}
+                    onGenerateAudio={onGenerateAudio}
+                    onReset={handleReset}
+                    source={source}
+                    listener={listener}
+                    L={L}
+                    W={W}
+                    H={H}
+                  />
+                )}
+              </>
+            }
           />
-        )}
-
-        {step === 2 && (
-          <MaterialStep
-            imageURL={imageURL}
-            mode={mode}
-            setMode={setMode}
-            samples={samples}
-            setSamples={setSamples}
-            override={override}
-            setOverride={setOverride}
-            suggested={suggested}
-            hasSuggested={hasSuggested}
-            materialCandidates={materialCandidates}
-            onSuggestMaterials={onSuggestMaterials}
-            busy={{ ...busy, surfaceDetection: surfaceDetectionBusy }}
-            err={err}
-            onClearAll={onClearMaterialSamples}
-            onNext={() => setStep(3)}
-            autoSurfaceResult={autoSurfaceResult}
-            surfaceDetectionBusy={surfaceDetectionBusy}
-            useManualMaterialFlow={useManualMaterialFlow}
-            setUseManualMaterialFlow={setUseManualMaterialFlow}
-          />
-        )}
-
-        {step === 3 && (
-          <EditorStep
-            L={L}
-            W={W}
-            H={H}
-            source={source}
-            setSource={setSource}
-            listener={listener}
-            setListener={setListener}
-            exclusions={exclusions}
-            setExclusions={setExclusions}
-            busy={busy}
-            onBack={() => setStep(2)}
-            onNext={onRecommendPanels}
-          />
-        )}
-
-        {step === 4 && (
-          <Dashboard
-            recommendation={recommendation}
-            rt60={rt60}
-            audio={audio}
-            busy={busy}
-            audioInputMode={audioInputMode}
-            onSelectAudioInputMode={onSelectAudioInputMode}
-            uploadedAudioFile={uploadedAudioFile}
-            onPickUploadedAudio={onPickUploadedAudio}
-            onGenerateAudio={onGenerateAudio}
-            onReset={handleReset}
-            source={source}
-            listener={listener}
-            L={L}
-            W={W}
-            H={H}
-          />
-        )}
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/how-it-works" element={<HowItWorksPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
 
       <style>{`
