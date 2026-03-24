@@ -617,7 +617,9 @@ export default function PanelView({
   onPlaceSource,
   onPlaceListener,
   onAddExclusion,
+  captureApiRef = null,
 }) {
+  const containerRef = useRef(null);
   const panels = recommendation?.panels ?? [];
   const responseExclusions = recommendation?.exclusions ?? exclusions ?? [];
   const sourceClearanceZones = recommendation?.source_clearance_zones ?? [];
@@ -672,8 +674,29 @@ export default function PanelView({
     return new Set();
   }, [interactive, editTool]);
 
+  useEffect(() => {
+    if (!captureApiRef) return undefined;
+
+    captureApiRef.current = {
+      captureSnapshot: async () => {
+        await new Promise((resolve) => window.requestAnimationFrame(resolve));
+
+        const canvas = containerRef.current?.querySelector("canvas");
+        if (!canvas) {
+          throw new Error("3D canvas is not ready yet.");
+        }
+
+        return canvas.toDataURL("image/png");
+      },
+    };
+
+    return () => {
+      captureApiRef.current = null;
+    };
+  }, [captureApiRef]);
+
   return (
-    <div className="w-full">
+    <div ref={containerRef} className="w-full">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="text-lg font-bold text-slate-900">{title}</div>
@@ -760,6 +783,7 @@ export default function PanelView({
         <div className="h-[clamp(18rem,46vh,34rem)]">
           <Canvas
             shadows={false}
+            gl={{ antialias: true, preserveDrawingBuffer: Boolean(captureApiRef) }}
             onContextMenu={(event) => {
               if (
                 interactive &&
