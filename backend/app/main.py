@@ -1,9 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import predict, recommend, materials, optimize, audio
 from fastapi.staticfiles import StaticFiles
 
-
+from app.routers import predict, recommend, materials, optimize, audio, surfaces
 
 app = FastAPI(title="AcuVisor Backend", version="0.1")
 
@@ -25,6 +24,6 @@ def health():
 app.include_router(predict.router)
 app.include_router(recommend.router)
 app.include_router(materials.router)
-app.include_router(optimize.router) 
+app.include_router(optimize.router)
 app.include_router(audio.router)
-
+app.include_router(surfaces.router)
