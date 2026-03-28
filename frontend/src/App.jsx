@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { api } from "./api";
 
 import { MATERIALS } from "./constants";
@@ -420,7 +420,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100">
-      <Header />
+      <Header onHomeClick={handleReset} />
 
       <main>
         <Routes>
@@ -524,3 +524,4 @@ export default function App() {
     </div>
   );
 }
+
