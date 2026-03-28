@@ -1,4 +1,11 @@
-const BASE = "http://127.0.0.1:8000";
+const DEFAULT_API_BASE = "http://127.0.0.1:8000";
+const BASE = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, "");
+
+export function apiUrl(path = "") {
+  if (!path) return BASE;
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${BASE}${path.startsWith("/") ? path : `/${path}`}`;
+}
 
 async function handleJsonResponse(res, path) {
   if (!res.ok) {
@@ -9,7 +16,7 @@ async function handleJsonResponse(res, path) {
 }
 
 async function postJson(path, body) {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(apiUrl(path), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -18,7 +25,7 @@ async function postJson(path, body) {
 }
 
 async function postForm(path, formData) {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(apiUrl(path), {
     method: "POST",
     body: formData,
   });
@@ -26,7 +33,7 @@ async function postForm(path, formData) {
 }
 
 async function getJson(path) {
-  const res = await fetch(`${BASE}${path}`);
+  const res = await fetch(apiUrl(path));
   return handleJsonResponse(res, path);
 }
 

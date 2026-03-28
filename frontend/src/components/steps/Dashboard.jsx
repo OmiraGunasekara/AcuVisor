@@ -4,6 +4,7 @@ import { AudioPlayer } from "../ui/AudioPlayer";
 import { RefreshCw, Download, BarChart3, Info, Volume2, Box, Play } from "lucide-react";
 import { fmt } from "../../utils/math";
 import { buildPdfReport, buildReportFilename } from "../../utils/report";
+import { apiUrl } from "../../api";
 
 export const Dashboard = ({
   recommendation,
@@ -216,18 +217,18 @@ export const Dashboard = ({
 
               {audio && (
                 <div className="space-y-4 pt-2">
-                  <AudioPlayer type="Clap Test" label="Before" src={`http://127.0.0.1:8000${audio.clap_before_audio}`} />
-                  <AudioPlayer type="Clap Test" label="After" src={`http://127.0.0.1:8000${audio.clap_after_audio}`} />
+                  <AudioPlayer type="Clap Test" label="Before" src={apiUrl(audio.clap_before_audio)} />
+                  <AudioPlayer type="Clap Test" label="After" src={apiUrl(audio.clap_after_audio)} />
                   <div className="border-t border-slate-100 my-2" />
                   <AudioPlayer
                     type={audio.speech_label || "Speech Sample"}
                     label="Before"
-                    src={`http://127.0.0.1:8000${audio.speech_before_audio}`}
+                    src={apiUrl(audio.speech_before_audio)}
                   />
                   <AudioPlayer
                     type={audio.speech_label || "Speech Sample"}
                     label="After"
-                    src={`http://127.0.0.1:8000${audio.speech_after_audio}`}
+                    src={apiUrl(audio.speech_after_audio)}
                   />
                 </div>
               )}
@@ -263,3 +264,5 @@ export const Dashboard = ({
     </div>
   );
 };
+
+

@@ -20,3 +20,11 @@ build/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Env
+.env
+.env.*
+!.env.example
+!frontend/.env.example
+!backend/.env.example
+
