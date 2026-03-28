@@ -9,8 +9,11 @@ import pyroomacoustics as pra
 import soundfile as sf
 from scipy.signal import fftconvolve, resample_poly
 
-AUDIO_DIR = "app/static/audio"
-SAMPLES_DIR = "app/static/samples"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+AUDIO_DIR = os.path.join(STATIC_DIR, "audio")
+SAMPLES_DIR = os.path.join(STATIC_DIR, "samples")
+
 FS = 32000
 MAX_AUDIO_RUN_FOLDERS = 10
 
@@ -426,3 +429,4 @@ def generate_audio(
             "z": float(mic_pos[2]),
         },
     }
+
