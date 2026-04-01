@@ -17,6 +17,24 @@ import { Dashboard } from "./components/steps/Dashboard";
 import AboutPage from "./pages/AboutPage";
 import HowItWorksPage from "./pages/HowItWorksPage";
 
+const PAGE_METADATA = {
+  "/": {
+    title: "AcuVisor | Acoustic Treatment Planning for Small Rooms",
+    description:
+      "AcuVisor helps plan acoustic treatment for small rooms using room photos, layout inputs, RT60 predictions, panel suggestions, and exportable reports.",
+  },
+  "/about": {
+    title: "About AcuVisor | Acoustic Treatment Planning App",
+    description:
+      "Learn how AcuVisor turns room photos, material assumptions, layout setup, and acoustic metrics into practical treatment planning for compact rooms.",
+  },
+  "/how-it-works": {
+    title: "How AcuVisor Works | From Room Photo to Treatment Plan",
+    description:
+      "See how AcuVisor guides you from room dimensions and material review to RT60 predictions, treatment recommendations, audio previews, and exportable reports.",
+  },
+};
+
 export default function App() {
   const location = useLocation();
   const [step, setStep] = useState(() => new URLSearchParams(window.location.search).get("start") === "true" ? 1 : 0);
@@ -27,6 +45,38 @@ export default function App() {
     }
   }, [location.pathname, location.search]);
 
+  useEffect(() => {
+    const metadata = PAGE_METADATA[location.pathname] ?? PAGE_METADATA["/"];
+    const canonicalUrl = `${window.location.origin}${location.pathname}`;
+    const absoluteImageUrl = `${window.location.origin}/acuvisor.png`;
+
+    document.title = metadata.title;
+
+    const updateMeta = (selector, content) => {
+      const element = document.querySelector(selector);
+      if (element) {
+        element.setAttribute("content", content);
+      }
+    };
+
+    updateMeta('meta[name="description"]', metadata.description);
+    updateMeta('meta[property="og:title"]', metadata.title);
+    updateMeta('meta[property="og:description"]', metadata.description);
+    updateMeta('meta[property="og:url"]', canonicalUrl);
+    updateMeta('meta[property="og:image"]', absoluteImageUrl);
+    updateMeta('meta[name="twitter:title"]', metadata.title);
+    updateMeta('meta[name="twitter:description"]', metadata.description);
+    updateMeta('meta[name="twitter:image"]', absoluteImageUrl);
+
+    let canonicalLink = document.querySelector('link[rel="canonical"]');
+    if (!canonicalLink) {
+      canonicalLink = document.createElement("link");
+      canonicalLink.setAttribute("rel", "canonical");
+      document.head.appendChild(canonicalLink);
+    }
+
+    canonicalLink.setAttribute("href", canonicalUrl);
+  }, [location.pathname]);
   const [L, setL] = useState(5.2);
   const [W, setW] = useState(4.1);
   const [H, setH] = useState(2.8);
@@ -524,4 +574,6 @@ export default function App() {
     </div>
   );
 }
+
+
 
