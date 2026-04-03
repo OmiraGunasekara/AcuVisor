@@ -56,10 +56,6 @@ async def suggest_material_from_bbox(
     x2: float = Form(..., ge=0, le=1),
     y2: float = Form(..., ge=0, le=1),
 ):
-    """
-    New route for auto-detected CV surface boxes.
-    Keeps the old click-based route intact as fallback.
-    """
     surface = surface.strip().lower()
     if surface not in {"wall", "floor", "ceiling"}:
         raise HTTPException(status_code=400, detail="surface must be wall|floor|ceiling")

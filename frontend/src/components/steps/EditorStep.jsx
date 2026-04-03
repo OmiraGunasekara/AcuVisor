@@ -104,7 +104,7 @@ export const EditorStep = ({
           <div>
             <h2 className="text-2xl font-bold text-slate-900">3D Room Editor</h2>
             <p className="text-slate-500 text-sm">
-              The room box uses your L x W x H dimensions directly. Place source/listener from the floor and side walls, and use right-drag to orbit while editing.
+              The room box uses your L x W x H dimensions directly. Place source & listener from the floor and side walls.
             </p>
           </div>
 
@@ -112,7 +112,7 @@ export const EditorStep = ({
             <div>
               <h3 className="font-semibold text-slate-900">Editing Tools</h3>
               <p className="mt-1 text-sm text-slate-500">
-                Floor clicks set source/listener x/y, side-wall clicks set height plus the remaining axis, and the number inputs still work for exact values. Exclusions are added by clicking directly on a wall.
+                Floor clicks set source listener x/y, side-wall clicks set height plus the remaining axis, and the number inputs still work for exact values. Exclusions are added by clicking directly on a wall.
               </p>
             </div>
 
