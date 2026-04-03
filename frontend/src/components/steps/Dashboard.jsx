@@ -66,7 +66,7 @@ export const Dashboard = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Analysis Results</h2>
-          <p className="text-slate-500">Optimized plan based on geometry + predicted materials.</p>
+          <p className="text-slate-500">Optimized plan based on geometry & predicted materials.</p>
         </div>
         <div className="flex gap-3">
           <button
