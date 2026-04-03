@@ -1,26 +1,4 @@
-﻿"""
-ga_service.py - AcuVisor panel placement optimiser.
-
-Changes from previous version
-------------------------------
-Three additions only - everything else is identical to your uploaded version:
-
-1. _first_reflection_fracs()
-   New helper that computes where sound from the source first bounces
-   off each wall before reaching the listener (image-source geometry).
-   Returns a normalised fraction (0-1) along each wall's width.
-
-2. _fitness() gains optional src / mic parameters
-   A small bonus (-0.01 per panel) is applied when a panel lands within
-   40 cm of the first reflection point on its wall. The bonus is
-   intentionally weak so it guides placement without overriding RT60.
-
-3. run_ga() gains optional src / mic parameters
-   Defaults to canonical positions [L/4, W/4, 1.5] and [L/2, W/2, 1.5]
-   when not supplied. Routers can pass user-selected positions directly.
-"""
-
-import hashlib
+﻿import hashlib
 import random
 from typing import Dict, List, Optional, Tuple
 
@@ -128,10 +106,7 @@ def _source_near_wall_exclusions(
     H: float,
     src: Optional[List[float]],
 ) -> List[Dict]:
-    """
-    When the source is very close to a wall, reserve a small patch on that
-    wall around the source projection so panels are not placed there.
-    """
+
     if not src:
         return []
 
@@ -173,16 +148,7 @@ def _first_reflection_fracs(
     src: List[float],
     mic: List[float],
 ) -> Dict[str, float]:
-    """
-    Compute where sound from the source first bounces off each wall
-    before reaching the listener, using the image-source method.
 
-    Returns a dict: wall name -> normalised fraction (0-1) along that
-    wall's width where the first reflection lands.
-
-    This is pure geometry - it does not touch the ML model at all.
-    Returns an empty dict if positions are missing or degenerate.
-    """
     if not src or not mic:
         return {}
 
@@ -467,10 +433,7 @@ def _z_idx(z: float, H: float = 2.8) -> int:
 
 def _warm_start(L: float, W: float, H: float,
                 max_coverage: float) -> Chromosome:
-    """
-    Starting layout: primary clusters at ear height on all four walls.
-    Accent clusters are discovered by the GA through the height variety bonus.
-    """
+
     avg_ww         = (2 * L + 2 * W) / 4.0
     norm_per_panel = (0.6 / avg_ww) * (1.2 / H)
     budget_panels  = max(4, int(max_coverage / (norm_per_panel + 1e-9)))
@@ -502,16 +465,7 @@ def run_ga(
     src: Optional[List[float]] = None,
     mic: Optional[List[float]] = None,
 ) -> Dict:
-    """
-    Optimise acoustic panel placement using zone-based grid cluster chromosomes.
 
-    src / mic - source and listener positions [x, y, z] in metres.
-                Used only to compute first-reflection bonuses in fitness.
-                Defaults to canonical positions when not supplied.
-                Routers may pass user-selected positions directly.
-
-    seed=None ? deterministic from the full optimisation inputs.
-    """
     # Use canonical positions if not provided by caller
     if src is None:
         src = [L / 4.0, W / 4.0, min(1.5, H - 0.05)]
@@ -534,29 +488,54 @@ def run_ga(
         pop.append(_rand_chrom())
 
     best_chrom = list(warm)
-    best_fit   = _fitness(warm, L, W, H, wall_a, floor_a, ceil_a,
-                          max_coverage, effective_exclusions, src, mic)
+    best_fit = _fitness(
+        warm, L, W, H, wall_a, floor_a, ceil_a,
+        max_coverage, effective_exclusions, src, mic
+    )
     no_improve = 0
 
+    # --- GA history tracking for analysis / plotting ---
+    generation_history: List[int] = []
+    best_fitness_history: List[float] = []
+    mean_fitness_history: List[float] = []
+    best_coverage_history: List[float] = []
+    best_panel_count_history: List[int] = []
+
     for _gen in range(generations):
-        scored, improved = [], False
+        scored = []
+        improved = False
 
         for chrom in pop:
-            f = _fitness(chrom, L, W, H, wall_a, floor_a, ceil_a,
-                         max_coverage, effective_exclusions, src, mic)
+            f = _fitness(
+                chrom, L, W, H, wall_a, floor_a, ceil_a,
+                max_coverage, effective_exclusions, src, mic
+            )
             scored.append((f, chrom))
             if f < best_fit:
-                best_fit   = f
+                best_fit = f
                 best_chrom = list(chrom)
-                improved   = True
+                improved = True
+
+        scored.sort(key=lambda x: x[0])
+
+        # Record generation statistics before selection/reproduction
+        gen_best_fit = float(scored[0][0])
+        gen_mean_fit = float(sum(f for f, _ in scored) / len(scored))
+
+        gen_best_panels, gen_best_cov = decode(scored[0][1], L, W, H, effective_exclusions)
+
+        generation_history.append(_gen)
+        best_fitness_history.append(gen_best_fit)
+        mean_fitness_history.append(gen_mean_fit)
+        best_coverage_history.append(float(_clamp01(gen_best_cov)))
+        best_panel_count_history.append(len(gen_best_panels))
 
         no_improve = 0 if improved else no_improve + 1
         if no_improve >= 12:
             break
 
-        scored.sort(key=lambda x: x[0])
         elite_n = max(4, population // 4)
-        elites  = [c for _, c in scored[:elite_n]]
+        elites = [c for _, c in scored[:elite_n]]
 
         if warm not in elites:
             elites[-1] = warm
@@ -579,14 +558,23 @@ def run_ga(
     used_cov = _clamp01(used_cov)
 
     rt60_before = float(predict_rt60(L, W, H, wall_a, floor_a, ceil_a, 0.0))
-    rt60_after  = float(predict_rt60(L, W, H, wall_a, floor_a, ceil_a, used_cov))
+    rt60_after = float(predict_rt60(L, W, H, wall_a, floor_a, ceil_a, used_cov))
 
     return {
         "used_coverage": float(used_cov),
-        "rt60_before":   rt60_before,
-        "rt60_after":    rt60_after,
-        "rt60_delta":    float(rt60_before - rt60_after),
+        "rt60_before": rt60_before,
+        "rt60_after": rt60_after,
+        "rt60_delta": float(rt60_before - rt60_after),
         "applied_exclusions": effective_exclusions,
         "source_clearance_zones": source_clearance_zones,
-        "panels":        best_panels,
+        "panels": best_panels,
+        "ga_history": {
+            "generation": generation_history,
+            "best_fitness": best_fitness_history,
+            "mean_fitness": mean_fitness_history,
+            "best_coverage": best_coverage_history,
+            "best_panel_count": best_panel_count_history,
+            "early_stopped": no_improve >= 12,
+            "generations_completed": len(generation_history),
+        },
     }

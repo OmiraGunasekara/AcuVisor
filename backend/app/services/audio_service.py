@@ -221,7 +221,7 @@ def prepare_dry_audio(x, fs_in, max_len_sec=8):
 
 def load_and_resample_dry_wav():
     os.makedirs(SAMPLES_DIR, exist_ok=True)
-    sample_path = os.path.join(SAMPLES_DIR, "dry_speech.wav")
+    sample_path = os.path.join(SAMPLES_DIR, "dry_speech_new.wav")
 
     if not os.path.exists(sample_path):
         x = np.zeros(FS * 2, dtype=np.float32)

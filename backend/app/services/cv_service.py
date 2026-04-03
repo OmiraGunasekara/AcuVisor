@@ -1,86 +1,103 @@
 import io
+import gc
 from typing import Dict, List
 
 from PIL import Image
-import torch
 import numpy as np
 
 from app.services.material_library import MVP_LABELS
 
-_device = "cuda" if torch.cuda.is_available() else "cpu"
+_device = None
 _model = None
 _processor = None
 
 
 def _ensure_model_loaded():
-    global _model, _processor
-
+    global _model, _processor, _device
     if _model is None:
-        print("Loading CLIP model...")
+        import torch
         from transformers import CLIPProcessor, CLIPModel
-
+        _device = "cuda" if torch.cuda.is_available() else "cpu"
+        print("Loading CLIP model...")
         _model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(_device)
         _processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
         _model.eval()
         print("CLIP model loaded successfully")
 
 
+def _unload_model():
+    global _model, _processor, _device
+    import torch
+    _model = None
+    _processor = None
+    _device = None
+    gc.collect()
+    torch.cuda.empty_cache()
+
+
 _MATERIAL_DESCRIPTIONS = {
     "wood": [
-        "wooden surface with visible grain lines and texture",
-        "natural wood material with brown organic patterns",
-        "hardwood with linear grain texture",
-        "timber planks with natural wood texture",
+        "wooden floor with natural grain lines running in one direction",
+        "brown timber planks with organic wood grain texture",
+        "hardwood floor with long parallel grain streaks",
+        "natural wood surface with knots and irregular grain pattern",
+        "warm brown wooden boards with visible wood fiber texture",
     ],
     "painted_plaster": [
-        "smooth painted wall with uniform matte finish",
-        "flat painted surface without texture",
-        "solid color painted interior wall",
-        "matte painted plaster with no pattern",
+        "smooth painted wall with completely uniform matte finish and no texture",
+        "flat solid color painted surface with no pattern or grain",
+        "interior wall painted in single color with no visible texture",
+        "matte painted plaster wall with perfectly smooth flat surface",
+        "uniform painted surface with slight sheen and no grout or grain",
     ],
     "gypsum": [
-        "white smooth drywall ceiling surface",
-        "flat white ceiling material",
-        "uniform white gypsum board surface",
-        "plain white ceiling with no texture",
+        "plain flat white ceiling with no texture or pattern",
+        "smooth white drywall surface with no grain or joints",
+        "uniform white ceiling board with matte flat finish",
+        "featureless white plasterboard ceiling surface",
+        "blank white interior ceiling with no markings",
     ],
     "carpet": [
-        "soft fuzzy carpet with fiber texture",
-        "textile floor covering with pile fibers",
-        "fabric floor material with woven loops",
-        "plush carpet with thick fiber texture",
+        "soft carpet floor with dense fiber pile texture",
+        "fuzzy fabric floor covering with textile fiber loops",
+        "plush carpet with soft raised fiber surface",
+        "woven carpet material with uniform fiber pile",
+        "fabric floor with soft matte surface and textile texture",
     ],
     "tile": [
-        "hard ceramic tiles with visible grout lines",
-        "square tiles with grid pattern and spacing",
-        "glossy tile surface with geometric layout",
-        "rigid tiles separated by grout joints",
+        "ceramic floor tiles with clearly visible straight grout lines forming a grid",
+        "square or rectangular tiles separated by thin grout joints in a regular pattern",
+        "glossy ceramic tile surface with repeating geometric grid of grout lines",
+        "hard floor tiles with uniform size and visible grout between each tile",
+        "polished stone or ceramic tiles with sharp edges and grout spacing",
     ],
     "concrete": [
-        "smooth gray concrete floor",
-        "gray cement surface",
-        "industrial concrete material",
-        "gray stone like concrete texture",
+        "rough gray concrete surface with porous texture",
+        "bare gray cement floor with no coating or grain",
+        "industrial gray concrete with aggregate texture",
+        "unfinished gray concrete surface with subtle roughness",
+        "flat gray cement material with matte finish and no pattern",
     ],
     "brick": [
-        "red rectangular bricks with mortar joints",
-        "exposed masonry wall with brick pattern",
-        "terracotta colored bricks in rows",
-        "textured brick wall with offset pattern",
+        "red rectangular clay bricks arranged in rows with white mortar joints",
+        "exposed brick wall with terracotta colored blocks and visible mortar",
+        "masonry wall with uniform brick pattern and horizontal mortar lines",
+        "rough textured red bricks separated by gray mortar joints",
+        "stacked rectangular bricks with offset alternating pattern",
     ],
     "glass": [
-        "hard transparent glass window pane",
-        "rigid see through glass surface with reflections",
-        "smooth solid glass with mirror like shine",
-        "clear inflexible glass material showing objects behind it",
-        "stiff translucent glass barrier with gloss",
+        "transparent glass window showing objects clearly through it",
+        "clear reflective glass surface with mirror like shine",
+        "smooth transparent glass pane with light reflection",
+        "see through glass material with high gloss finish",
+        "rigid transparent glass with strong specular reflection",
     ],
     "curtain": [
-        "soft opaque fabric hanging with folds",
-        "flexible textile curtain with wrinkles and creases",
-        "thick cloth drapery blocking light",
-        "hanging fabric material with visible weave texture",
-        "limp textile with draped appearance and no transparency",
+        "hanging fabric curtain with soft folds and draping",
+        "textile drape with vertical wrinkles and soft folds",
+        "thick cloth hanging from a rod with gathered folds",
+        "soft opaque fabric panel hanging with flowing drape",
+        "flexible woven curtain material with creases and folds",
     ],
 }
 
@@ -106,10 +123,7 @@ def crop_by_click(img: Image.Image, x_norm: float, y_norm: float, box_size: int 
 
 
 def crop_by_bbox(img: Image.Image, x1: float, y1: float, x2: float, y2: float, pad_ratio: float = 0.04) -> Image.Image:
-    """
-    Future-friendly helper for Phase 1/2 auto-detected surface boxes.
-    Coordinates are normalized [0..1].
-    """
+ 
     w, h = img.size
 
     x1 = max(0.0, min(1.0, float(x1)))
@@ -173,19 +187,31 @@ def _analyze_color(crop: Image.Image) -> Dict:
 def _apply_color_penalties(material_scores: Dict[str, float], color_info: Dict) -> Dict[str, float]:
     penalties = {}
 
+    # Wood must be warm and brownish
     if not color_info["is_brownish"] and not color_info["is_warm"]:
-        penalties["wood"] = 0.30
-
+        penalties["wood"] = 0.50
     if color_info["is_neutral_gray"]:
-        penalties["concrete"] = 1.50
-        penalties["painted_plaster"] = 1.30
-        penalties["gypsum"] = 1.30
+        penalties["wood"] = 0.70
+    if color_info["is_very_light"]:
+        penalties["wood"] = 0.60
 
+    # Tile is hard and light - penalize if very dark or brownish
+    if color_info["is_very_dark"]:
+        penalties["tile"] = 0.50
+    if color_info["is_brownish"] and not color_info["is_neutral_gray"]:
+        penalties["tile"] = 0.40
+
+    # Carpet is soft - penalize if very light or gray
+    if color_info["is_very_light"] or color_info["is_neutral_gray"]:
+        penalties["carpet"] = 0.30
+
+    # Concrete must be gray - penalize if warm or brownish
+    if color_info["is_brownish"] or color_info["is_reddish"]:
+        penalties["concrete"] = 0.50
+
+    # Brick must be reddish
     if not color_info["is_reddish"]:
-        penalties["brick"] = 0.20
-
-    if color_info["is_very_light"] and color_info["is_neutral_gray"]:
-        penalties["carpet"] = 0.40
+        penalties["brick"] = 0.60
 
     adjusted = {}
     for mat, score in material_scores.items():
@@ -222,79 +248,85 @@ def _normalize_candidates(sorted_materials: List, top_k: int = 5) -> List[Dict]:
 
 
 def suggest_material_from_crop(crop: Image.Image, surface: str) -> Dict:
-    _ensure_model_loaded()
-
-    color_info = _analyze_color(crop)
-    valid_materials = _SURFACE_VALID_MATERIALS.get(surface, list(MVP_LABELS))
-
-    all_texts = []
-    text_to_material = []
-
-    for material, descriptions in _MATERIAL_DESCRIPTIONS.items():
-        if material in MVP_LABELS and material in valid_materials:
-            for desc in descriptions:
-                all_texts.append(desc)
-                text_to_material.append(material)
-
-    if not all_texts:
-        fallback = _surface_fallback(surface, color_info)
-        return {
-            "surface": surface,
-            "suggested_label": fallback,
-            "confidence": 0.5,
-            "candidates": [{"label": fallback, "confidence": 0.5}],
-            "note": "No valid materials found for this surface",
-        }
-
     try:
-        inputs = _processor(
-            text=all_texts,
-            images=crop,
-            return_tensors="pt",
-            padding=True,
-        )
-        inputs = {k: v.to(_device) for k, v in inputs.items()}
+        import torch
+        _ensure_model_loaded()
 
-        with torch.no_grad():
-            outputs = _model(**inputs)
-            logits_per_image = outputs.logits_per_image
-            probs = logits_per_image.softmax(dim=1)[0]
+        color_info = _analyze_color(crop)
+        valid_materials = _SURFACE_VALID_MATERIALS.get(surface, list(MVP_LABELS))
 
-    except Exception as e:
-        fallback = _surface_fallback(surface, color_info)
-        return {
-            "surface": surface,
-            "suggested_label": fallback,
-            "confidence": 0.5,
-            "candidates": [{"label": fallback, "confidence": 0.5}],
-            "note": f"CLIP inference failed, fallback used: {str(e)}",
+        all_texts = []
+        text_to_material = []
+
+        for material, descriptions in _MATERIAL_DESCRIPTIONS.items():
+            if material in MVP_LABELS and material in valid_materials:
+                for desc in descriptions:
+                    all_texts.append(desc)
+                    text_to_material.append(material)
+
+        if not all_texts:
+            fallback = _surface_fallback(surface, color_info)
+            return {
+                "surface": surface,
+                "suggested_label": fallback,
+                "confidence": 0.5,
+                "candidates": [{"label": fallback, "confidence": 0.5}],
+                "note": "No valid materials found for this surface",
+            }
+
+        try:
+            crop = crop.resize((224, 224))
+            inputs = _processor(
+                text=all_texts,
+                images=crop,
+                return_tensors="pt",
+                padding=True,
+            )
+            inputs = {k: v.to(_device) for k, v in inputs.items()}
+
+            with torch.no_grad():
+                outputs = _model(**inputs)
+                logits_per_image = outputs.logits_per_image
+                probs = logits_per_image.softmax(dim=1)[0]
+
+        except Exception as e:
+            fallback = _surface_fallback(surface, color_info)
+            return {
+                "surface": surface,
+                "suggested_label": fallback,
+                "confidence": 0.5,
+                "candidates": [{"label": fallback, "confidence": 0.5}],
+                "note": f"CLIP inference failed, fallback used: {str(e)}",
+            }
+
+        material_scores: Dict[str, List[float]] = {}
+        for idx, material in enumerate(text_to_material):
+            material_scores.setdefault(material, []).append(float(probs[idx].item()))
+
+        material_max_scores = {
+            material: max(scores)
+            for material, scores in material_scores.items()
         }
 
-    material_scores: Dict[str, List[float]] = {}
-    for idx, material in enumerate(text_to_material):
-        material_scores.setdefault(material, []).append(float(probs[idx].item()))
+        adjusted_scores = _apply_color_penalties(material_max_scores, color_info)
+        sorted_materials = sorted(adjusted_scores.items(), key=lambda x: x[1], reverse=True)
+        candidates = _normalize_candidates(sorted_materials, top_k=5)
 
-    material_max_scores = {
-        material: max(scores)
-        for material, scores in material_scores.items()
-    }
+        if not candidates:
+            fallback = _surface_fallback(surface, color_info)
+            candidates = [{"label": fallback, "confidence": 0.5}]
 
-    sorted_materials = sorted(material_max_scores.items(), key=lambda x: x[1], reverse=True)
+        best = candidates[0]
+        best_label = best["label"]
+        best_conf = best["confidence"]
 
-    candidates = _normalize_candidates(sorted_materials, top_k=5)
+        return {
+            "surface": surface,
+            "suggested_label": best_label,
+            "confidence": float(best_conf),
+            "candidates": candidates,
+            "note": f"CLIP material suggestion with brightness fallback metadata ({color_info['brightness']:.2f})",
+        }
 
-    if not candidates:
-        fallback = _surface_fallback(surface, color_info)
-        candidates = [{"label": fallback, "confidence": 0.5}]
-
-    best = candidates[0]
-    best_label = best["label"]
-    best_conf = best["confidence"]
-
-    return {
-        "surface": surface,
-        "suggested_label": best_label,
-        "confidence": float(best_conf),
-        "candidates": candidates,
-        "note": f"CLIP material suggestion with brightness fallback metadata ({color_info['brightness']:.2f})",
-    }
+    finally:
+        _unload_model()
