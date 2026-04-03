@@ -44,7 +44,6 @@ const outputs = [
 export default function HowItWorksPage() {
   return (
     <div className="relative min-h-screen bg-slate-50 pb-20 overflow-hidden selection:bg-blue-200 selection:text-blue-900 animate-fade-in font-sans">
-      {/* Decorative background vectors */}
       <div className="absolute top-0 right-0 -translate-y-12 translate-x-1/3 pointer-events-none">
         <svg width="800" height="800" viewBox="0 0 800 800" fill="none" xmlns="http://www.w3.org/2000/svg" className="opacity-[0.03] text-slate-900">
           <circle cx="400" cy="400" r="399" stroke="currentColor" strokeWidth="2"/>
@@ -60,7 +59,6 @@ export default function HowItWorksPage() {
       </div>
 
       <div className="relative z-10 mx-auto max-w-6xl px-6 pt-16 md:pt-24 lg:px-8 space-y-24">
-        {/* Hero Section */}
         <section className="relative text-center max-w-3xl mx-auto">
           <div className="inline-flex items-center gap-2 rounded-full border border-blue-200/50 bg-blue-50/80 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-blue-600 mb-8 backdrop-blur-sm shadow-sm">
             <Wand2 className="h-4 w-4" />
@@ -75,9 +73,7 @@ export default function HowItWorksPage() {
           </p>
         </section>
 
-        {/* Steps section with connecting lines */}
         <section className="relative max-w-5xl mx-auto">
-          {/* Subtle connecting line for desktop */}
           <div className="absolute hidden md:block top-[110px] left-0 right-0 h-0.5 -translate-y-1/2 bg-gradient-to-r from-transparent via-slate-200 to-transparent z-0" />
           
           <div className="grid gap-8 md:grid-cols-4 relative z-10">
@@ -109,7 +105,6 @@ export default function HowItWorksPage() {
           </div>
         </section>
 
-        {/* Bottom Context Cards */}
         <section className="grid gap-8 lg:grid-cols-[1.1fr,0.9fr]">
           <article className="relative rounded-[2.5rem] border border-slate-200/80 bg-white/80 backdrop-blur-md p-10 shadow-xl shadow-slate-200/40">
             <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-widest text-blue-600">
@@ -163,7 +158,6 @@ export default function HowItWorksPage() {
               </div>
             </article>
 
-            {/* Disclaimer strip */}
             <div className="rounded-[2rem] border border-amber-200/50 bg-gradient-to-r from-amber-50 to-orange-50 p-6 text-sm leading-relaxed text-amber-900 shadow-md flex items-start gap-4 hover:shadow-lg transition-shadow">
               <div className="flex shrink-0 h-10 w-10 items-center justify-center rounded-full bg-amber-100/80 text-amber-600 mt-1">
                 <Volume2 className="h-5 w-5" />

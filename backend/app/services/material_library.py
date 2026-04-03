@@ -11,4 +11,4 @@ MATERIAL_LIBRARY = {
     "curtain":         {"alpha": 0.35, "display": "Curtains / fabric"},
 }
 
-MVP_LABELS = list(MATERIAL_LIBRARY.keys())
+SUPPORTED_MATERIAL_LABELS = list(MATERIAL_LIBRARY.keys())

@@ -41,7 +41,9 @@ export const api = {
   health: () => getJson("/health"),
   segmentSurfaces: (formData) => postForm("/segment-surfaces", formData),
   suggestMaterial: (formData) => postForm("/suggest-material", formData),
-  suggestMaterialFromBbox: (formData) => postForm("/suggest-material-from-bbox", formData),
+  // Replaced by suggestMaterialsFromBboxes; kept commented for easy rollback.
+  // suggestMaterialFromBbox: (formData) => postForm("/suggest-material-from-bbox", formData),
+  suggestMaterialsFromBboxes: (formData) => postForm("/suggest-materials-from-bboxes", formData),
   recommendPanels: (payload) => postJson("/recommend-panels", payload),
   predictRt60: (payload) => postJson("/predict-rt60", payload),
   generateAudio: (payload) => postJson("/generate-audio", payload),

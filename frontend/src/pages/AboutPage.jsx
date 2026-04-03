@@ -38,7 +38,6 @@ const principles = [
 export default function AboutPage() {
   return (
     <div className="relative min-h-screen bg-slate-50 pb-20 overflow-hidden selection:bg-blue-200 selection:text-blue-900 animate-fade-in font-sans">
-      {/* Glowing background meshes */}
       <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center opacity-40">
         <div className="absolute top-[-10%] left-[-10%] h-[600px] w-[600px] rounded-full bg-blue-300 mix-blend-multiply blur-[128px]" />
         <div className="absolute top-[20%] right-[-10%] h-[600px] w-[600px] rounded-full bg-indigo-200 mix-blend-multiply blur-[128px]" />
@@ -46,7 +45,6 @@ export default function AboutPage() {
       </div>
 
       <div className="relative z-10 mx-auto max-w-6xl px-6 pt-12 md:pt-16 lg:px-8 space-y-12 md:space-y-20">
-        {/* Premium Hero Section */}
         <section className="group relative overflow-hidden rounded-[2.5rem] bg-slate-900 px-6 py-10 shadow-2xl md:px-10 md:py-16 border border-slate-800">
           <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-black opacity-80" />
           
@@ -114,7 +112,6 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* Dynamic Capabilities Grid */}
         <section>
           <div className="mb-12 text-center relative z-10">
             <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
@@ -147,7 +144,6 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* Mission / Principles */}
         <section className="grid gap-8 lg:grid-cols-[1fr,1fr] xl:gap-16 relative z-10">
           <div className="relative group">
             <div className="absolute -inset-4 rounded-[2.5rem] bg-gradient-to-r from-blue-100 to-purple-100 blur-2xl opacity-50 group-hover:opacity-100 transition duration-500 pointer-events-none" />

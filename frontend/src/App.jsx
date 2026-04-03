@@ -246,19 +246,26 @@ export default function App() {
     return await api.suggestMaterial(fd);
   };
 
-  const suggestFromAutoBbox = async (surface) => {
-    const rect = samples[surface];
-    if (!rect) throw new Error(`No detected ${surface} region available.`);
+  const suggestFromAutoBboxes = async () => {
+    const boxes = {};
+
+    for (const surface of ["wall", "floor", "ceiling"]) {
+      const rect = samples[surface];
+      if (!rect) throw new Error(`No detected ${surface} region available.`);
+      boxes[surface] = {
+        x1: Number(rect.x1),
+        y1: Number(rect.y1),
+        x2: Number(rect.x2),
+        y2: Number(rect.y2),
+      };
+    }
 
     const fd = new FormData();
     fd.append("image", imageFile);
-    fd.append("surface", surface);
-    fd.append("x1", String(rect.x1));
-    fd.append("y1", String(rect.y1));
-    fd.append("x2", String(rect.x2));
-    fd.append("y2", String(rect.y2));
+    fd.append("boxes", JSON.stringify(boxes));
 
-    return await api.suggestMaterialFromBbox(fd);
+    const batch = await api.suggestMaterialsFromBboxes(fd);
+    return batch?.results || {};
   };
 
   const onSuggestMaterials = async () => {
@@ -266,17 +273,20 @@ export default function App() {
     setBusy((b) => ({ ...b, suggest: true }));
 
     try {
-      const runForSurface = async (surface) => {
-        if (useManualMaterialFlow) {
-          return await suggestFromManualClick(surface);
-        }
-        return await suggestFromAutoBbox(surface);
-      };
+      let wallRes;
+      let floorRes;
+      let ceilRes;
 
-      const wallRes = await runForSurface("wall");
-      const floorRes = await runForSurface("floor");
-      const ceilRes = await runForSurface("ceiling");
-
+      if (useManualMaterialFlow) {
+        wallRes = await suggestFromManualClick("wall");
+        floorRes = await suggestFromManualClick("floor");
+        ceilRes = await suggestFromManualClick("ceiling");
+      } else {
+        const results = await suggestFromAutoBboxes();
+        wallRes = results.wall;
+        floorRes = results.floor;
+        ceilRes = results.ceiling;
+      }
       const extractLabel = (res) =>
         res?.suggested_label ?? res?.predicted_label ?? res?.label ?? null;
 
