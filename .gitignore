@@ -28,3 +28,6 @@ build/
 !frontend/.env.example
 !backend/.env.example
 
+#Testing scripts
+scripts/
+
