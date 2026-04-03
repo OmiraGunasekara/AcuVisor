@@ -1,118 +1,171 @@
 # AcuVisor
 
-AcuVisor is an acoustic treatment planning app for small rooms. It combines room dimensions, a room photo, material suggestions, panel placement logic, and audio preview generation to help turn a rough room idea into a practical treatment plan.
+AcuVisor is a small-room acoustic treatment planning app. It combines room dimensions, a room photo, estimated surface materials, layout inputs, RT60 prediction, panel placement, and before/after audio previews to turn an early room idea into a practical treatment plan.
 
-This frontend is built with React and Vite and connects to a FastAPI backend that handles prediction, recommendation, image-based surface analysis, and auralization.
+The project is split into a React + Vite frontend and a FastAPI backend with ML- and simulation-driven services for surface analysis, material suggestion, acoustic prediction, and audio auralization.
 
-## What the app does
+## What AcuVisor does
 
 AcuVisor guides the user through a four-step workflow:
 
 1. Room setup
    - Enter room dimensions.
-   - Upload a room photo.
+   - Upload a reference photo of the room.
 2. Materials
-   - Detect wall, floor, and ceiling regions from the uploaded image.
-   - Suggest likely surface materials.
-   - Allow manual overrides when needed.
+   - Detect likely wall, floor, and ceiling regions from the uploaded image.
+   - Suggest probable surface materials.
+   - Fall back to a manual sampling flow when automatic detection is not reliable enough.
 3. Layout
-   - Place the source and listener positions.
-   - Mark exclusion zones.
-   - Preview the room and panel layout in 3D.
+   - Place the sound source and listener in a 3D room view.
+   - Mark wall exclusion zones where treatment should not be placed.
 4. Results
-   - Recommend treatment coverage and panel placement.
+   - Generate recommended acoustic panel placement.
    - Predict RT60 before and after treatment.
-   - Generate untreated vs treated audio previews.
-   - Export a PDF report.
+   - Produce untreated vs treated audio previews.
+   - Export a PDF report with metrics and layout details.
 
-## Stack
+## Key capabilities
 
-Frontend:
+- Guided room-analysis workflow built for compact studios, edit rooms, and listening spaces.
+- Automatic surface segmentation from room photos using a vision model.
+- Material suggestion from detected regions or manual crop selection.
+- 3D room visualization with source, listener, exclusions, and treatment layout.
+- Genetic-algorithm-based panel placement recommendations.
+- RT60 prediction using a trained MLP model bundled with the backend.
+- Audio preview generation with a built-in dry speech sample or uploaded dry audio.
+- Shareable PDF report export from the frontend.
+
+## Architecture
+
+### Frontend
+
+The frontend lives in `frontend/` and is responsible for:
+
+- The step-by-step user workflow
+- Image upload and manual material sampling UI
+- 3D room and panel visualization
+- Calling backend APIs
+- Displaying metrics and audio previews
+- Exporting PDF reports
+
+### Backend
+
+The backend lives in `backend/` and is responsible for:
+
+- RT60 prediction
+- Surface segmentation
+- Material suggestion
+- Panel recommendation and optimization
+- Audio preview generation
+- Serving generated audio and sample assets from `/static`
+
+## Tech stack
+
+### Frontend
+
 - React 19
 - Vite 7
-- React Router
+- React Router 7
 - Tailwind CSS
 - Three.js with React Three Fiber and Drei
 - jsPDF
+- lucide-react
 
-Backend:
+### Backend
+
 - FastAPI
-- TensorFlow
+- TensorFlow / Keras
 - scikit-learn
 - PyTorch / torchvision
 - transformers
 - pyroomacoustics
-- soundfile / scipy
+- scipy
+- soundfile
+- Pillow
 
-## Project structure
+## Repository structure
 
 ```text
 AcuVisor/
-- frontend/
-  - src/
-    - components/
-    - pages/
-    - utils/
-    - api.js
-    - App.jsx
-  - public/
-  - package.json
-  - .env.example
-- backend/
-  - app/
-    - routers/
-    - services/
-    - ml/
-    - static/
-  - requirements.txt
-  - .env.example
-- ml/
-  - notebooks/
+|- frontend/
+|  |- public/
+|  |- src/
+|  |  |- components/
+|  |  |- pages/
+|  |  |- utils/
+|  |  |- api.js
+|  |  |- App.jsx
+|  |  |- constants.js
+|  |- package.json
+|  |- .env.example
+|- backend/
+|  |- app/
+|  |  |- ml/
+|  |  |- routers/
+|  |  |- services/
+|  |  |- static/
+|  |  |- main.py
+|  |- requirements.txt
+|  |- .env.example
+|- ml/
+|  |- notebooks/
+|- README.md
 ```
 
-## Frontend environment variables
+## Prerequisites
 
-Create a `frontend/.env` file if you want to override the local default.
+Before running locally, make sure you have:
+
+- Python installed with `venv` support
+- Node.js and npm
+- Enough disk space and memory for backend ML dependencies
+- Internet access on first run if the backend needs to download Hugging Face model weights for vision tasks
+
+## Environment variables
+
+### Frontend
+
+Create `frontend/.env` if you want to override the default backend URL.
 
 ```env
 VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
 Notes:
-- In development, the frontend falls back to `http://127.0.0.1:8000` if `VITE_API_BASE_URL` is not set.
-- In production, set `VITE_API_BASE_URL` to your deployed backend URL.
 
-## Backend environment variables
+- If `VITE_API_BASE_URL` is not set, the frontend falls back to `http://127.0.0.1:8000`.
+- In production, set this to your deployed backend origin.
 
-Create a `backend/.env` file if needed.
+### Backend
+
+Create `backend/.env` if needed.
 
 ```env
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
 Notes:
-- `CORS_ORIGINS` should be a comma-separated list of allowed frontend origins.
-- For production, include your Vercel frontend URL here.
+
+- `CORS_ORIGINS` is a comma-separated list of allowed frontend origins.
+- In production, include your deployed frontend URL here.
 
 ## Running locally
 
 ### 1. Start the backend
-
-From the repo root:
 
 ```bash
 cd backend
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 The backend will be available at `http://127.0.0.1:8000`.
 
 ### 2. Start the frontend
 
-In a second terminal:
+Open a second terminal:
 
 ```bash
 cd frontend
@@ -122,78 +175,79 @@ npm run dev
 
 The frontend will be available at `http://localhost:5173`.
 
-## Available backend endpoints
+## API routes
 
-Core routes used by the frontend:
-- `GET /health`
-- `POST /segment-surfaces`
-- `POST /suggest-material`
-- `POST /suggest-material-from-bbox`
-- `POST /predict-rt60`
-- `POST /recommend-panels`
-- `POST /generate-audio`
-- `POST /generate-audio-upload`
+These are the main routes exposed by the backend:
 
-The backend also serves generated audio and sample assets from `/static`.
+- `GET /health` - health check
+- `POST /segment-surfaces` - detect wall, floor, and ceiling regions from an uploaded image
+- `POST /suggest-material` - suggest a material from a manual click/crop workflow
+- `POST /suggest-material-from-bbox` - suggest a material from a detected bounding box
+- `POST /predict-rt60` - predict before/after RT60 from room and coverage inputs
+- `POST /recommend-panels` - generate panel placement recommendations
+- `POST /optimize-panels-ga` - direct GA optimization endpoint
+- `POST /generate-audio` - generate before/after audio previews using the bundled dry sample
+- `POST /generate-audio-upload` - generate before/after audio previews from uploaded dry audio
 
-## Build the frontend
+The backend also serves static files from `/static`.
 
-```bash
-cd frontend
-npm run build
-```
+## ML and runtime notes
 
-The production build is written to `frontend/dist`.
+- The RT60 predictor uses bundled model assets in `backend/app/ml/`.
+- Surface segmentation loads `facebook/mask2former-swin-small-ade-semantic` through `transformers`.
+- Material suggestion loads `openai/clip-vit-base-patch32` through `transformers`.
+- The vision models are loaded lazily during requests and unloaded afterward.
+- The first segmentation or material-suggestion request may be noticeably slower because model weights may need to download.
+- Generated audio previews are written under `backend/app/static/audio/`.
+- The backend keeps only the latest 10 generated audio run folders.
+- Uploaded dry audio currently supports WAV, FLAC, and OGG.
 
-## Deployment
+## Notebooks
 
-### Frontend on Vercel
+The `ml/notebooks/` folder contains research and experimentation notebooks used during development, including:
 
-Recommended settings:
+- acoustic exploration
+- dataset generation
+- MLP model training
+
+These notebooks are supporting artifacts and are not required to run the app locally.
+
+## Deployment notes
+
+### Frontend
+
+The repo includes Vercel configuration under `frontend/vercel.json`.
+
+Typical settings:
+
 - Framework preset: `Vite`
 - Root directory: `frontend`
 - Build command: `npm run build`
 - Output directory: `dist`
 - Environment variable: `VITE_API_BASE_URL=https://your-backend-domain`
 
-### Backend on DigitalOcean
+### Backend
 
-You can deploy the backend on a Droplet or App Platform.
-
-Suggested startup command:
+A typical production command is:
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
 
-If your platform injects a port variable, use:
+If your platform injects a port variable, use the equivalent command for that environment.
 
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port $PORT
-```
+Operational notes:
 
-Production notes:
-- Set `CORS_ORIGINS` to include your Vercel domain.
-- The backend includes ML and audio dependencies, so plan for a heavier runtime than a typical CRUD API.
-- Generated audio files are written under `backend/app/static/audio`.
+- Set `CORS_ORIGINS` to include your frontend domain.
+- Backend startup and first-request latency can be heavier than a simple CRUD API because of ML and audio dependencies.
+- Static audio files are generated on disk, so production deployment should account for writable storage.
 
-## Development notes
+## Limitations and intended use
 
-- The frontend API client is defined in `frontend/src/api.js`.
-- Audio preview URLs are built from the same backend base URL used for API requests.
-- The backend serves static files using an absolute path so it is less sensitive to the working directory in production.
+AcuVisor is best used as an early-stage planning tool for small rooms. It is useful for exploring treatment options, visualizing panel placement, and comparing likely acoustic outcomes before installation.
 
-## Current status
-
-This project includes:
-- Automatic and manual room surface workflows
-- Material suggestion flow with overrides
-- 3D room visualization and panel layout preview
-- RT60 prediction
-- Auralization with built-in or uploaded dry audio
-- PDF report export
+It is not a replacement for full acoustic measurement, detailed room calibration, or a professional on-site consultation for complex spaces.
 
 ## License
 
 No license has been added yet.
-
