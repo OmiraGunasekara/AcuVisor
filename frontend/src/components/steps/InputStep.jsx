@@ -1,7 +1,9 @@
 import React from "react";
 import { Upload, Maximize, CheckCircle } from "lucide-react";
 
+// Configuration UI for setting room dimensions and uploading a photo
 export const InputStep = ({ L, setL, W, setW, H, setH, onPickImage, imageFile, onNext }) => {
+  // Catch files dragged and dropped onto the upload zone
   const handleDrop = (e) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
@@ -9,6 +11,7 @@ export const InputStep = ({ L, setL, W, setW, H, setH, onPickImage, imageFile, o
     }
   };
 
+  // Catch standard click-to-upload file selections
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       onPickImage(e.target.files[0]);

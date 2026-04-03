@@ -36,6 +36,7 @@ class AudioRequest(BaseModel):
     mic_z: Optional[float] = Field(None, ge=0)
 
 
+# Endpoint for generating an audio preview with built-in samples
 @router.post("/generate-audio")
 def generate_audio_endpoint(req: AudioRequest):
     return generate_audio(
@@ -55,6 +56,7 @@ def generate_audio_endpoint(req: AudioRequest):
     )
 
 
+# Endpoint for generating an audio preview using a user-uploaded file
 @router.post("/generate-audio-upload")
 async def generate_audio_upload_endpoint(
     payload: str = Form(...),

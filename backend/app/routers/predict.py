@@ -18,6 +18,7 @@ class PredictResponse(BaseModel):
     rt60_after: float
     rt60_delta: float
 
+# Endpoint for predicting RT60 times before and after treatment
 @router.post("/predict-rt60", response_model=PredictResponse)
 def predict(req: PredictRequest):
     rt60_before = predict_rt60(req.L, req.W, req.H, req.wall_a, req.floor_a, req.ceil_a, 0.0)

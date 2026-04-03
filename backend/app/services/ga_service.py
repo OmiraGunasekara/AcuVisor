@@ -1,4 +1,4 @@
-﻿import hashlib
+import hashlib
 import random
 from typing import Dict, List, Optional, Tuple
 
@@ -450,6 +450,7 @@ def _warm_start(L: float, W: float, H: float,
 
 # -- Main GA -----------------------------------------------------------------
 
+# Executes a genetic algorithm to find the mathematically optimal panel configuration
 def run_ga(
     L: float,
     W: float,
@@ -465,7 +466,6 @@ def run_ga(
     src: Optional[List[float]] = None,
     mic: Optional[List[float]] = None,
 ) -> Dict:
-
     # Use canonical positions if not provided by caller
     if src is None:
         src = [L / 4.0, W / 4.0, min(1.5, H - 0.05)]

@@ -25,6 +25,7 @@ def _attach_material_metadata(result: dict) -> dict:
     return result
 
 
+# Analyzes a single clicked point to suggest a material
 @router.post("/suggest-material")
 async def suggest_material(
     image: UploadFile = File(...),
@@ -48,31 +49,7 @@ async def suggest_material(
     return _attach_material_metadata(result)
 
 
-# Replaced by /suggest-materials-from-bboxes for the auto-detected material flow.
-
-# @router.post("/suggest-material-from-bbox")
-# async def suggest_material_from_bbox(
-#     image: UploadFile = File(...),
-#     surface: str = Form(..., description="wall|floor|ceiling"),
-#     x1: float = Form(..., ge=0, le=1),
-#     y1: float = Form(..., ge=0, le=1),
-#     x2: float = Form(..., ge=0, le=1),
-#     y2: float = Form(..., ge=0, le=1),
-# ):
-#     surface = surface.strip().lower()
-#     if surface not in {"wall", "floor", "ceiling"}:
-#         raise HTTPException(status_code=400, detail="surface must be wall|floor|ceiling")
-
-#     content = await image.read()
-#     try:
-#         img = Image.open(io.BytesIO(content)).convert("RGB")
-#     except Exception:
-#         raise HTTPException(status_code=400, detail="Invalid image file")
-
-#     crop = crop_by_bbox(img, x1=x1, y1=y1, x2=x2, y2=y2)
-#     result = suggest_material_from_crop(crop, surface)
-#     return _attach_material_metadata(result)
-
+# Analyzes drawn bounding boxes to suggest materials for walls, floors, and ceilings
 @router.post("/suggest-materials-from-bboxes")
 async def suggest_materials_from_bboxes(
     image: UploadFile = File(...),

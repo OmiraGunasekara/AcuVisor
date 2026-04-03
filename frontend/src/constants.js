@@ -1,3 +1,4 @@
+// Core application configuration and dictionary constants
 export const MATERIALS = {
   painted_plaster: { label: "Painted plaster", a: 0.07 },
   gypsum: { label: "Gypsum board", a: 0.1 },

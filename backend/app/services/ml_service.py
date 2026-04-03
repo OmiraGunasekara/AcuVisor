@@ -12,6 +12,7 @@ SCALER_PATH = os.path.join(ML_DIR, "feature_scaler.pkl")
 model = load_model(MODEL_PATH)
 scaler = joblib.load(SCALER_PATH)
 
+# Queries the pre-trained Neural Network to predict RT60 reverberation times
 def predict_rt60(L, W, H, wall_a, floor_a, ceil_a, panel_coverage: float) -> float:
     x = np.array([[L, W, H, wall_a, floor_a, ceil_a, panel_coverage]], dtype=np.float32)
     x_scaled = scaler.transform(x)

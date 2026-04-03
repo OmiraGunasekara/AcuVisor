@@ -1,10 +1,12 @@
 import React, { useRef, useState } from "react";
 import { Play, Pause } from "lucide-react";
 
+// Reusable audio playback component for previewing simulations
 export const AudioPlayer = ({ type, label, src }) => {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
 
+  // Handles safe toggle for audio playback
   const toggle = async () => {
     const el = audioRef.current;
     if (!el) return;

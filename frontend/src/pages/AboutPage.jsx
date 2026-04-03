@@ -35,6 +35,7 @@ const principles = [
   "Keep recommendations visual, explainable, and grounded in room dimensions, layout, and material assumptions.",
 ];
 
+// Informational "About" page outlining project capabilities and constraints
 export default function AboutPage() {
   return (
     <div className="relative min-h-screen bg-slate-50 pb-20 overflow-hidden selection:bg-blue-200 selection:text-blue-900 animate-fade-in font-sans">

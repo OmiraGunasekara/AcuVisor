@@ -35,6 +35,7 @@ const PAGE_METADATA = {
   },
 };
 
+// Main Application Orchestrator
 export default function App() {
   const location = useLocation();
   const [step, setStep] = useState(() => new URLSearchParams(window.location.search).get("start") === "true" ? 1 : 0);
@@ -77,21 +78,26 @@ export default function App() {
 
     canonicalLink.setAttribute("href", canonicalUrl);
   }, [location.pathname]);
+  // Room dimensions in meters
   const [L, setL] = useState(5.2);
   const [W, setW] = useState(4.1);
   const [H, setH] = useState(2.8);
 
+  // Uploaded image state
   const [imageFile, setImageFile] = useState(null);
   const [imageURL, setImageURL] = useState("");
 
+  // Material selection mode and drawn zones
   const [mode, setMode] = useState(null);
   const [samples, setSamples] = useState({ wall: null, floor: null, ceiling: null });
 
+  // Automatic surface detection results
   const [autoSurfaceResult, setAutoSurfaceResult] = useState(null);
   const [surfaceDetectionTried, setSurfaceDetectionTried] = useState(false);
   const [surfaceDetectionBusy, setSurfaceDetectionBusy] = useState(false);
   const [useManualMaterialFlow, setUseManualMaterialFlow] = useState(false);
 
+  // Selected material types (e.g. wall, floor)
   const [override, setOverride] = useState({
     wall: "painted_plaster",
     floor: "wood",
@@ -106,12 +112,14 @@ export default function App() {
     ceiling: null,
   });
 
+  // 3D placement coordinates
   const [source, setSource] = useState({ x: 1.3, y: 1.0, z: 1.5 });
   const [listener, setListener] = useState({ x: 2.6, y: 2.05, z: 1.5 });
   const [exclusions, setExclusions] = useState([]);
 
   const [busy, setBusy] = useState({ suggest: false, rec: false, audio: false });
   const [err, setErr] = useState("");
+  // Algorithm results
   const [recommendation, setRecommendation] = useState(null);
   const [rt60, setRt60] = useState(null);
   const [audio, setAudio] = useState(null);
@@ -182,6 +190,7 @@ export default function App() {
     };
   };
 
+  // Requests auto-detected surfaces from the backend
   const runSurfaceDetection = async () => {
     if (!imageFile) return;
 
@@ -268,6 +277,7 @@ export default function App() {
     return batch?.results || {};
   };
 
+  // Fetches material suggestions from the backend
   const onSuggestMaterials = async () => {
     setErr("");
     setBusy((b) => ({ ...b, suggest: true }));
@@ -339,6 +349,7 @@ export default function App() {
     hasSuggested,
   ]);
 
+  // Calculates the optimal panel layout for the room
   const onRecommendPanels = async () => {
     setErr("");
     setBusy((b) => ({ ...b, rec: true }));
@@ -398,6 +409,7 @@ export default function App() {
     }
   };
 
+  // Requests AI simulated audio preview
   const onGenerateAudio = async () => {
     setErr("");
     setBusy((b) => ({ ...b, audio: true }));
@@ -445,6 +457,7 @@ export default function App() {
     }
   };
 
+  // Resets the entire application state
   const handleReset = () => {
     setStep(0);
     setImageFile(null);

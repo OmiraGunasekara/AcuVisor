@@ -21,6 +21,7 @@ def parse_cors_origins():
 cors_origins = parse_cors_origins()
 allow_credentials = "*" not in cors_origins
 
+# FastAPI application entry point and configuration
 app = FastAPI(title="AcuVisor Backend", version="0.1")
 
 app.add_middleware(
@@ -34,6 +35,7 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+# Basic health check endpoint
 @app.get("/health")
 def health():
     return {"status": "ok"}

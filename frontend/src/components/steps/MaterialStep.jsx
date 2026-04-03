@@ -3,6 +3,7 @@ import { RefreshCw, PenTool, Eraser, Wand2, Layers } from "lucide-react";
 import { MATERIALS } from "../../constants";
 import { clamp01, fmt } from "../../utils/math";
 
+// UI Step for detecting, drawing, and confirming room surface materials
 export const MaterialStep = ({
   imageURL,
   mode,
@@ -27,6 +28,7 @@ export const MaterialStep = ({
   const overlayRef = useRef(null);
   const [drag, setDrag] = useState(null);
 
+  // Normalizes mouse coordinates over the image
   const getNormPos = (evt) => {
     const box = overlayRef.current.getBoundingClientRect();
     const x = clamp01((evt.clientX - box.left) / box.width);
@@ -34,6 +36,7 @@ export const MaterialStep = ({
     return { x, y };
   };
 
+  // Sorts bounding box coordinates so width/height are positive
   const finalizeRect = (r) => {
     const x1 = Math.min(r.x0, r.x1);
     const x2 = Math.max(r.x0, r.x1);
@@ -64,6 +67,7 @@ export const MaterialStep = ({
     setMode(null);
   };
 
+  // Helper component to render bounding boxes on the image
   const RectOverlay = ({ rect, color, label }) => {
     if (!rect) return null;
     const left = rect.x1 * 100;

@@ -12,6 +12,7 @@ function mobileNavLinkClassName({ isActive }) {
   }`;
 }
 
+// Global site navigation bar
 export const Header = ({ onHomeClick }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();

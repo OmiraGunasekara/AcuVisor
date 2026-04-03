@@ -327,6 +327,7 @@ def _suggest_material_from_crop_loaded(crop: Image.Image, surface: str) -> Dict:
     }
 
 
+# Uses a pre-trained CLIP model to suggest the most likely material from a single crop
 def suggest_material_from_crop(crop: Image.Image, surface: str) -> Dict:
     try:
         _ensure_model_loaded()
@@ -335,6 +336,7 @@ def suggest_material_from_crop(crop: Image.Image, surface: str) -> Dict:
         _unload_model()
 
 
+# Evaluates multiple geometric crops simultaneously using the CLIP model
 def suggest_materials_from_crops(crops: Dict[str, Image.Image]) -> Dict[str, Dict]:
     try:
         _ensure_model_loaded()

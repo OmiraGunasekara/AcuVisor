@@ -71,6 +71,7 @@ def _surface_area_threshold(surface: str) -> float:
     return thresholds.get(surface, 0.03)
 
 
+# Uses Mask2Former to automatically detect and segment walls, floors, and ceilings
 def segment_room_surfaces(image_bytes: bytes) -> Dict:
     import torch
     import torch.nn.functional as F

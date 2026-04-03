@@ -37,12 +37,11 @@ async function getJson(path) {
   return handleJsonResponse(res, path);
 }
 
+// Centralized API client for all backend communication
 export const api = {
   health: () => getJson("/health"),
   segmentSurfaces: (formData) => postForm("/segment-surfaces", formData),
   suggestMaterial: (formData) => postForm("/suggest-material", formData),
-  // Replaced by suggestMaterialsFromBboxes; kept commented for easy rollback.
-  // suggestMaterialFromBbox: (formData) => postForm("/suggest-material-from-bbox", formData),
   suggestMaterialsFromBboxes: (formData) => postForm("/suggest-materials-from-bboxes", formData),
   recommendPanels: (payload) => postJson("/recommend-panels", payload),
   predictRt60: (payload) => postJson("/predict-rt60", payload),

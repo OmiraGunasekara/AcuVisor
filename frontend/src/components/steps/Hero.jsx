@@ -1,6 +1,7 @@
 import React from "react";
 import { ArrowRight } from "lucide-react";
 
+// Landing Page
 export const Hero = ({ onStart }) => (
   <div className="min-h-[calc(100dvh-4rem-1px)] flex flex-col items-center justify-center px-4 py-10 text-center bg-gradient-to-b from-slate-900 to-slate-950 text-white animate-fade-in">
     <div className="w-full max-w-4xl space-y-8">

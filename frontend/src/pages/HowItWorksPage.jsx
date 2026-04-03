@@ -41,6 +41,7 @@ const outputs = [
   "Exportable PDF report for sharing or documentation",
 ];
 
+// Step-by-step explanatory page showing the app's workflow and outputs
 export default function HowItWorksPage() {
   return (
     <div className="relative min-h-screen bg-slate-50 pb-20 overflow-hidden selection:bg-blue-200 selection:text-blue-900 animate-fade-in font-sans">

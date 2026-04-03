@@ -3,6 +3,7 @@ import PanelView from "../PanelView";
 import { Trash2, RefreshCw } from "lucide-react";
 import { fmt } from "../../utils/math";
 
+// Main editor for configuring the 3D room objects
 export const EditorStep = ({
   L,
   W,
@@ -17,16 +18,19 @@ export const EditorStep = ({
   onBack,
   onNext,
 }) => {
+  // Active placement tool
   const [editTool, setEditTool] = useState("source");
   const [exWidth, setExWidth] = useState(0.8);
   const [exHeight, setExHeight] = useState(0.8);
 
+  // Clamps point input to keep it within room bounds
   const clampPointValue = (rawValue, max) => {
     const numeric = Number(rawValue);
     if (!Number.isFinite(numeric)) return 0.05;
     return Number(Math.max(0.05, Math.min(numeric, Math.max(Number(max) - 0.05, 0.05))).toFixed(2));
   };
 
+  // Helper to safely update a single coordinate (X, Y, or Z)
   const updatePoint = (setter, axis, value, max) => {
     setter((prev) => ({
       ...prev,
@@ -34,6 +38,7 @@ export const EditorStep = ({
     }));
   };
 
+  // UI component for X, Y, Z coordinate inputs
   const renderPointEditor = (label, point, setPoint, tone, tool) => (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
