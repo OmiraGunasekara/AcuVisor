@@ -100,6 +100,7 @@ function describePanel(panel, index, L, W, H) {
   };
 }
 
+// Converts an item configuration into a 3D box mesh object for rendering
 function buildWallItemMesh(item, L, W, H, inset, thickness) {
   const rect = resolveWallRect(item, L, W, H);
   if (!rect) return null;
@@ -216,6 +217,7 @@ function WallBadge({ position, label }) {
   );
 }
 
+// Manages the camera position and perspective angle dynamically
 function ViewController({ preset, L, W, H, controlsRef }) {
   const { camera } = useThree();
 
@@ -259,6 +261,7 @@ function ViewController({ preset, L, W, H, controlsRef }) {
   return null;
 }
 
+// Maps a wall click point into a new exclusion zone
 function wallClickToExclusion(wall, roomPoint, L, W, H, widthM, heightM) {
   const safeWidth = Math.max(0.2, Number(widthM || 0.8));
   const safeHeight = Math.max(0.2, Number(heightM || 0.8));
@@ -300,6 +303,7 @@ function wallClickToExclusion(wall, roomPoint, L, W, H, widthM, heightM) {
   };
 }
 
+// Core ThreeJS scene layout containing all geometries, lights, and helpers
 function RoomScene({
   L,
   W,
@@ -602,6 +606,7 @@ function RoomScene({
   );
 }
 
+// Main 3D Canvas wrapper component handling layout and interactions
 export default function PanelView({
   L = 5.2,
   W = 4.1,

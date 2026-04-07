@@ -2,6 +2,7 @@ import React from "react";
 import { Check } from "lucide-react";
 import { FLOW_STEPS } from "../../constants";
 
+// Visual timeline showing the user's progress through the form
 export const StepProgress = ({ step }) => {
   const activeStep = Math.min(Math.max(step, 1), FLOW_STEPS.length);
   const lineInset = FLOW_STEPS.length > 1 ? 100 / (FLOW_STEPS.length * 2) : 0;

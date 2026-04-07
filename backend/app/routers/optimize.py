@@ -36,6 +36,7 @@ class OptimizeRequest(BaseModel):
     generations: int = Field(25, ge=5, le=200)
     seed: int = Field(42, ge=0, le=10_000)
 
+# Legacy endpoint for running raw genetic algorithm optimization
 @router.post("/optimize-panels-ga")
 def optimize_panels_ga(req: OptimizeRequest):
     exclusions = [e.model_dump() for e in req.exclusions]

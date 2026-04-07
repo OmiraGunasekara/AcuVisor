@@ -35,6 +35,7 @@ const PAGE_METADATA = {
   },
 };
 
+// Main Application Orchestrator
 export default function App() {
   const location = useLocation();
   const [step, setStep] = useState(() => new URLSearchParams(window.location.search).get("start") === "true" ? 1 : 0);
@@ -77,21 +78,26 @@ export default function App() {
 
     canonicalLink.setAttribute("href", canonicalUrl);
   }, [location.pathname]);
+  // Room dimensions in meters
   const [L, setL] = useState(5.2);
   const [W, setW] = useState(4.1);
   const [H, setH] = useState(2.8);
 
+  // Uploaded image state
   const [imageFile, setImageFile] = useState(null);
   const [imageURL, setImageURL] = useState("");
 
+  // Material selection mode and drawn zones
   const [mode, setMode] = useState(null);
   const [samples, setSamples] = useState({ wall: null, floor: null, ceiling: null });
 
+  // Automatic surface detection results
   const [autoSurfaceResult, setAutoSurfaceResult] = useState(null);
   const [surfaceDetectionTried, setSurfaceDetectionTried] = useState(false);
   const [surfaceDetectionBusy, setSurfaceDetectionBusy] = useState(false);
   const [useManualMaterialFlow, setUseManualMaterialFlow] = useState(false);
 
+  // Selected material types (e.g. wall, floor)
   const [override, setOverride] = useState({
     wall: "painted_plaster",
     floor: "wood",
@@ -106,12 +112,14 @@ export default function App() {
     ceiling: null,
   });
 
+  // 3D placement coordinates
   const [source, setSource] = useState({ x: 1.3, y: 1.0, z: 1.5 });
   const [listener, setListener] = useState({ x: 2.6, y: 2.05, z: 1.5 });
   const [exclusions, setExclusions] = useState([]);
 
   const [busy, setBusy] = useState({ suggest: false, rec: false, audio: false });
   const [err, setErr] = useState("");
+  // Algorithm results
   const [recommendation, setRecommendation] = useState(null);
   const [rt60, setRt60] = useState(null);
   const [audio, setAudio] = useState(null);
@@ -182,6 +190,7 @@ export default function App() {
     };
   };
 
+  // Requests auto-detected surfaces from the backend
   const runSurfaceDetection = async () => {
     if (!imageFile) return;
 
@@ -246,37 +255,48 @@ export default function App() {
     return await api.suggestMaterial(fd);
   };
 
-  const suggestFromAutoBbox = async (surface) => {
-    const rect = samples[surface];
-    if (!rect) throw new Error(`No detected ${surface} region available.`);
+  const suggestFromAutoBboxes = async () => {
+    const boxes = {};
+
+    for (const surface of ["wall", "floor", "ceiling"]) {
+      const rect = samples[surface];
+      if (!rect) throw new Error(`No detected ${surface} region available.`);
+      boxes[surface] = {
+        x1: Number(rect.x1),
+        y1: Number(rect.y1),
+        x2: Number(rect.x2),
+        y2: Number(rect.y2),
+      };
+    }
 
     const fd = new FormData();
     fd.append("image", imageFile);
-    fd.append("surface", surface);
-    fd.append("x1", String(rect.x1));
-    fd.append("y1", String(rect.y1));
-    fd.append("x2", String(rect.x2));
-    fd.append("y2", String(rect.y2));
+    fd.append("boxes", JSON.stringify(boxes));
 
-    return await api.suggestMaterialFromBbox(fd);
+    const batch = await api.suggestMaterialsFromBboxes(fd);
+    return batch?.results || {};
   };
 
+  // Fetches material suggestions from the backend
   const onSuggestMaterials = async () => {
     setErr("");
     setBusy((b) => ({ ...b, suggest: true }));
 
     try {
-      const runForSurface = async (surface) => {
-        if (useManualMaterialFlow) {
-          return await suggestFromManualClick(surface);
-        }
-        return await suggestFromAutoBbox(surface);
-      };
+      let wallRes;
+      let floorRes;
+      let ceilRes;
 
-      const wallRes = await runForSurface("wall");
-      const floorRes = await runForSurface("floor");
-      const ceilRes = await runForSurface("ceiling");
-
+      if (useManualMaterialFlow) {
+        wallRes = await suggestFromManualClick("wall");
+        floorRes = await suggestFromManualClick("floor");
+        ceilRes = await suggestFromManualClick("ceiling");
+      } else {
+        const results = await suggestFromAutoBboxes();
+        wallRes = results.wall;
+        floorRes = results.floor;
+        ceilRes = results.ceiling;
+      }
       const extractLabel = (res) =>
         res?.suggested_label ?? res?.predicted_label ?? res?.label ?? null;
 
@@ -329,6 +349,7 @@ export default function App() {
     hasSuggested,
   ]);
 
+  // Calculates the optimal panel layout for the room
   const onRecommendPanels = async () => {
     setErr("");
     setBusy((b) => ({ ...b, rec: true }));
@@ -388,6 +409,7 @@ export default function App() {
     }
   };
 
+  // Requests AI simulated audio preview
   const onGenerateAudio = async () => {
     setErr("");
     setBusy((b) => ({ ...b, audio: true }));
@@ -435,6 +457,7 @@ export default function App() {
     }
   };
 
+  // Resets the entire application state
   const handleReset = () => {
     setStep(0);
     setImageFile(null);

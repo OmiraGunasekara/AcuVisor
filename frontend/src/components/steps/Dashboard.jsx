@@ -6,6 +6,7 @@ import { fmt } from "../../utils/math";
 import { buildPdfReport, buildReportFilename } from "../../utils/report";
 import { apiUrl } from "../../api";
 
+// Final step showing acoustic results, reports, and audio simulation
 export const Dashboard = ({
   recommendation,
   rt60,
@@ -28,6 +29,7 @@ export const Dashboard = ({
 
   if (!recommendation) return null;
 
+  // Captures the 3D canvas and generates a PDF report
   const handleExportReport = async () => {
     setExportBusy(true);
 

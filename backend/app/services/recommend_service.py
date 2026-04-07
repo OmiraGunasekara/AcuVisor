@@ -20,6 +20,7 @@ def _apply_exclusions(candidate, exclusions):
             return False
     return True
 
+# Basic geometric fallback for placing acoustic panels sequentially
 def recommend_panels(target_coverage: float, exclusions: list[dict]) -> dict:
     candidates = [
         _normalize_rect("north", 0.15, 0.45, 0.25, 0.65),

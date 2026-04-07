@@ -311,6 +311,7 @@ def make_clap(fs=FS, length_sec=2.0):
     return normalize_audio(x, peak=0.9)
 
 
+# Generates auralization audio files to preview the room before and after treatment
 def generate_audio(
     L,
     W,

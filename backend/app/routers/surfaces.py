@@ -8,6 +8,7 @@ from app.services.surface_segmentation_service import segment_room_surfaces
 router = APIRouter()
 
 
+# Analyzes an image to detect major room surfaces
 @router.post("/segment-surfaces")
 async def segment_surfaces(image: UploadFile = File(...)):
     content = await image.read()

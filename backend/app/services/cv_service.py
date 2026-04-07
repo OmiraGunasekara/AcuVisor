@@ -5,7 +5,7 @@ from typing import Dict, List
 from PIL import Image
 import numpy as np
 
-from app.services.material_library import MVP_LABELS
+from app.services.material_library import SUPPORTED_MATERIAL_LABELS
 
 _device = None
 _model = None
@@ -247,86 +247,102 @@ def _normalize_candidates(sorted_materials: List, top_k: int = 5) -> List[Dict]:
     return normalized
 
 
-def suggest_material_from_crop(crop: Image.Image, surface: str) -> Dict:
-    try:
-        import torch
-        _ensure_model_loaded()
+def _suggest_material_from_crop_loaded(crop: Image.Image, surface: str) -> Dict:
+    import torch
 
-        color_info = _analyze_color(crop)
-        valid_materials = _SURFACE_VALID_MATERIALS.get(surface, list(MVP_LABELS))
+    color_info = _analyze_color(crop)
+    valid_materials = _SURFACE_VALID_MATERIALS.get(surface, list(SUPPORTED_MATERIAL_LABELS))
 
-        all_texts = []
-        text_to_material = []
+    all_texts = []
+    text_to_material = []
 
-        for material, descriptions in _MATERIAL_DESCRIPTIONS.items():
-            if material in MVP_LABELS and material in valid_materials:
-                for desc in descriptions:
-                    all_texts.append(desc)
-                    text_to_material.append(material)
+    for material, descriptions in _MATERIAL_DESCRIPTIONS.items():
+        if material in SUPPORTED_MATERIAL_LABELS and material in valid_materials:
+            for desc in descriptions:
+                all_texts.append(desc)
+                text_to_material.append(material)
 
-        if not all_texts:
-            fallback = _surface_fallback(surface, color_info)
-            return {
-                "surface": surface,
-                "suggested_label": fallback,
-                "confidence": 0.5,
-                "candidates": [{"label": fallback, "confidence": 0.5}],
-                "note": "No valid materials found for this surface",
-            }
-
-        try:
-            crop = crop.resize((224, 224))
-            inputs = _processor(
-                text=all_texts,
-                images=crop,
-                return_tensors="pt",
-                padding=True,
-            )
-            inputs = {k: v.to(_device) for k, v in inputs.items()}
-
-            with torch.no_grad():
-                outputs = _model(**inputs)
-                logits_per_image = outputs.logits_per_image
-                probs = logits_per_image.softmax(dim=1)[0]
-
-        except Exception as e:
-            fallback = _surface_fallback(surface, color_info)
-            return {
-                "surface": surface,
-                "suggested_label": fallback,
-                "confidence": 0.5,
-                "candidates": [{"label": fallback, "confidence": 0.5}],
-                "note": f"CLIP inference failed, fallback used: {str(e)}",
-            }
-
-        material_scores: Dict[str, List[float]] = {}
-        for idx, material in enumerate(text_to_material):
-            material_scores.setdefault(material, []).append(float(probs[idx].item()))
-
-        material_max_scores = {
-            material: max(scores)
-            for material, scores in material_scores.items()
-        }
-
-        adjusted_scores = _apply_color_penalties(material_max_scores, color_info)
-        sorted_materials = sorted(adjusted_scores.items(), key=lambda x: x[1], reverse=True)
-        candidates = _normalize_candidates(sorted_materials, top_k=5)
-
-        if not candidates:
-            fallback = _surface_fallback(surface, color_info)
-            candidates = [{"label": fallback, "confidence": 0.5}]
-
-        best = candidates[0]
-        best_label = best["label"]
-        best_conf = best["confidence"]
-
+    if not all_texts:
+        fallback = _surface_fallback(surface, color_info)
         return {
             "surface": surface,
-            "suggested_label": best_label,
-            "confidence": float(best_conf),
-            "candidates": candidates,
-            "note": f"CLIP material suggestion with brightness fallback metadata ({color_info['brightness']:.2f})",
+            "suggested_label": fallback,
+            "confidence": 0.5,
+            "candidates": [{"label": fallback, "confidence": 0.5}],
+            "note": "No valid materials found for this surface",
         }
 
+    try:
+        crop = crop.resize((224, 224))
+        inputs = _processor(
+            text=all_texts,
+            images=crop,
+            return_tensors="pt",
+            padding=True,
+        )
+        inputs = {k: v.to(_device) for k, v in inputs.items()}
+
+        with torch.no_grad():
+            outputs = _model(**inputs)
+            logits_per_image = outputs.logits_per_image
+            probs = logits_per_image.softmax(dim=1)[0]
+
+    except Exception as e:
+        fallback = _surface_fallback(surface, color_info)
+        return {
+            "surface": surface,
+            "suggested_label": fallback,
+            "confidence": 0.5,
+            "candidates": [{"label": fallback, "confidence": 0.5}],
+            "note": f"CLIP inference failed, fallback used: {str(e)}",
+        }
+
+    material_scores: Dict[str, List[float]] = {}
+    for idx, material in enumerate(text_to_material):
+        material_scores.setdefault(material, []).append(float(probs[idx].item()))
+
+    material_max_scores = {
+        material: max(scores)
+        for material, scores in material_scores.items()
+    }
+
+    adjusted_scores = _apply_color_penalties(material_max_scores, color_info)
+    sorted_materials = sorted(adjusted_scores.items(), key=lambda x: x[1], reverse=True)
+    candidates = _normalize_candidates(sorted_materials, top_k=5)
+
+    if not candidates:
+        fallback = _surface_fallback(surface, color_info)
+        candidates = [{"label": fallback, "confidence": 0.5}]
+
+    best = candidates[0]
+    best_label = best["label"]
+    best_conf = best["confidence"]
+
+    return {
+        "surface": surface,
+        "suggested_label": best_label,
+        "confidence": float(best_conf),
+        "candidates": candidates,
+        "note": f"CLIP material suggestion with brightness fallback metadata ({color_info['brightness']:.2f})",
+    }
+
+
+# Uses a pre-trained CLIP model to suggest the most likely material from a single crop
+def suggest_material_from_crop(crop: Image.Image, surface: str) -> Dict:
+    try:
+        _ensure_model_loaded()
+        return _suggest_material_from_crop_loaded(crop, surface)
+    finally:
+        _unload_model()
+
+
+# Evaluates multiple geometric crops simultaneously using the CLIP model
+def suggest_materials_from_crops(crops: Dict[str, Image.Image]) -> Dict[str, Dict]:
+    try:
+        _ensure_model_loaded()
+        return {
+            surface: _suggest_material_from_crop_loaded(crop, surface)
+            for surface, crop in crops.items()
+        }
     finally:
         _unload_model()

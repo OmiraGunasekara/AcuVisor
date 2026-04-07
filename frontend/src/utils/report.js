@@ -66,6 +66,7 @@ export function buildReportFilename() {
   return `acuvisor-report-${timestamp}.pdf`;
 }
 
+// Generates the final downloadable PDF report using jsPDF
 export function buildPdfReport({
   recommendation,
   rt60,

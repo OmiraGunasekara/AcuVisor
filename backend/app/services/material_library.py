@@ -1,4 +1,5 @@
 
+# Dictionary of acoustic materials and their alpha absorption coefficients
 MATERIAL_LIBRARY = {
     "painted_plaster": {"alpha": 0.07, "display": "Painted plaster / painted wall"},
     "gypsum":          {"alpha": 0.10, "display": "Gypsum / drywall"},
@@ -11,4 +12,4 @@ MATERIAL_LIBRARY = {
     "curtain":         {"alpha": 0.35, "display": "Curtains / fabric"},
 }
 
-MVP_LABELS = list(MATERIAL_LIBRARY.keys())
+SUPPORTED_MATERIAL_LABELS = list(MATERIAL_LIBRARY.keys())

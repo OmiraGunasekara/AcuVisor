@@ -160,6 +160,7 @@ def _add_exclusion_dimensions(ex: dict, L: float, W: float, H: float) -> Exclusi
     )
 
 
+# Top-level endpoint that calculates the full acoustic panel recommendation
 @router.post("", response_model=RecommendResponse)
 async def recommend_panels(req: RecommendRequest):
     try:
